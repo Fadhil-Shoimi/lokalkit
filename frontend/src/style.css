@@ -113,7 +113,7 @@ main { flex: 1; overflow: auto; padding: 18px 20px 24px; display: flex; flex-dir
 .tab.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
 .count { font-size: 11px; background: var(--surface-2); border-radius: 10px; padding: 1px 7px; margin-left: 4px; }
 
-.new-project { display: flex; gap: 8px; margin-bottom: 12px; }
+.new-project { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .new-project input, .new-project select, .settings input:not([type=checkbox]) {
   border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 7px 10px; outline: none;
 }
@@ -222,3 +222,7 @@ legend { font-weight: 600; padding: 0 6px; }
 
 .php-update { border: 0; border-radius: 8px; padding: 6px 10px; background: var(--accent); color: var(--accent-ink); font-weight: 600; font-size: 12.5px; cursor: pointer; white-space: nowrap; }
 .php-update:disabled { opacity: .7; cursor: default; }
+
+.np-db { flex-basis: 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.np-db select, .np-db input { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 8px; padding: 5px 8px; font-size: 13px; }
+.np-db input { width: 170px; font-family: var(--mono); }

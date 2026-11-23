@@ -188,4 +188,37 @@ func TestImportDatabasesIntegration(t *testing.T) {
 	if !PortFree(lport) {
 		t.Error("legacy server still running")
 	}
+
+	// 4) New projects with "Create MySQL database".
+	query := func(sql string) string {
+		out, err := exec.Command("mysql", "-uroot", "-h127.0.0.1", "-P"+strconv.Itoa(cfg.MySQLPort), "-N", "-e", sql).CombinedOutput()
+		if err != nil {
+			t.Fatalf("%s: %v %s", sql, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	if _, err := m.CreateProject("plain-site", "blank", DBChoice{Mode: "mysql"}); err != nil {
+		t.Fatal(err)
+	}
+	if query("SHOW DATABASES LIKE 'plain_site'") != "plain_site" {
+		t.Error("blank PHP database not created")
+	}
+	idx, _ := os.ReadFile(filepath.Join(m.P.WWW, "plain-site", "index.php"))
+	if !strings.Contains(string(idx), "'plain_site'") {
+		t.Errorf("index.php should check the database: %s", idx)
+	}
+	fakePHP(t, m, false)
+	if _, err := m.CreateProject("shop", "laravel-react", DBChoice{Mode: "mysql", Name: "shop_db"}); err != nil {
+		t.Fatal(err)
+	}
+	waitTask(t, m, "shop")
+	env, _ := os.ReadFile(filepath.Join(m.P.WWW, "shop", ".env"))
+	for _, want := range []string{"DB_CONNECTION=mysql", "DB_DATABASE=shop_db", "DB_PORT=" + strconv.Itoa(cfg.MySQLPort)} {
+		if !strings.Contains(string(env), want) {
+			t.Errorf(".env missing %q:\n%s", want, env)
+		}
+	}
+	if query("SHOW DATABASES LIKE 'shop_db'") != "shop_db" {
+		t.Error("Laravel database not created")
+	}
 }

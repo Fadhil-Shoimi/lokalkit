@@ -69,6 +69,16 @@
         </select>
         <button class="btn primary" type="submit">+ Create</button>
         <button class="btn" type="button" id="btnShowImport" title="Add projects you already have, e.g. from Laragon">Import…</button>
+        <div class="np-db">
+          <label for="npDb">Database</label>
+          <select id="npDb">
+            <option value="mysql">Create a MySQL database</option>
+            <option value="sqlite">SQLite (a file, no server)</option>
+            <option value="none">No database</option>
+          </select>
+          <span id="npDbNameWrap">named <input id="npDbName" spellcheck="false" autocomplete="off" placeholder="project_name"/></span>
+          <span class="muted-text" id="npDbHint"></span>
+        </div>
       </form>
       <div class="import-panel" id="importPanel" hidden>
         <div class="import-head">

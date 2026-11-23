@@ -199,7 +199,7 @@ func (m *Manager) MailpitURL() string {
 }
 
 // CreateProject makes a new folder in www. kind: "blank" or "laravel".
-func (m *Manager) CreateProject(name, kind string) (Project, error) {
+func (m *Manager) CreateProject(name, kind string, db DBChoice) (Project, error) {
 	label := HostLabel(name)
 	if label == "" || label != name {
 		return Project{}, errors.New("project names may only contain lowercase letters, numbers and '-' (e.g. my-shop)")
@@ -208,6 +208,16 @@ func (m *Manager) CreateProject(name, kind string) (Project, error) {
 	if exists(dir) {
 		return Project{}, fmt.Errorf("folder %s already exists", name)
 	}
+	if db.Name == "" {
+		db.Name = filepathSafeDB(name)
+	}
+	if db.Mode == "mysql" {
+		// Fail early (MySQL missing, bad name) before anything is created.
+		if err := m.CreateMySQLDatabase(db.Name); err != nil {
+			return Project{}, err
+		}
+	}
+	m.tasks.rememberDB(name, db)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return Project{}, err
 	}
@@ -221,7 +231,7 @@ func (m *Manager) CreateProject(name, kind string) (Project, error) {
 		// Runs in the background; progress shows on the project row.
 		go m.installLaravel(name, dir, kind)
 	default:
-		page := fmt.Sprintf("<?php\n// Project %s, created by LokalKit\n?>\n<!doctype html>\n<html><head><meta charset=\"utf-8\"><title>%s</title></head>\n<body style=\"font-family:system-ui;padding:40px\">\n<h1>%s</h1>\n<p>PHP <?= PHP_VERSION ?> is running. Edit this file at <code><?= __FILE__ ?></code></p>\n</body></html>\n", name, name, name)
+		page := blankIndexPHP(name, db, m.config().MySQLPort)
 		if err := os.WriteFile(filepath.Join(dir, "index.php"), []byte(page), 0o644); err != nil {
 			return Project{}, err
 		}
@@ -247,4 +257,28 @@ func filepathSafeDB(name string) string {
 		out = append(out, r)
 	}
 	return string(out)
+}
+
+// blankIndexPHP is the starter page of a "Blank PHP" project.
+func blankIndexPHP(name string, db DBChoice, port int) string {
+	dbBlock := ""
+	if db.Mode == "mysql" {
+		dbBlock = fmt.Sprintf(`
+<?php
+// Database created by LokalKit
+$db = @new mysqli('127.0.0.1', 'root', '', '%s', %d);
+?>
+<p>Database <code>%s</code>: <?= $db->connect_errno ? 'not connected (' . htmlspecialchars($db->connect_error) . ')' : 'connected ✓' ?></p>
+`, db.Name, port, db.Name)
+	}
+	return fmt.Sprintf(`<?php
+// Project %s, created by LokalKit
+?>
+<!doctype html>
+<html><head><meta charset="utf-8"><title>%s</title></head>
+<body style="font-family:system-ui;padding:40px">
+<h1>%s</h1>
+<p>PHP <?= PHP_VERSION ?> is running. Edit this file at <code><?= __FILE__ ?></code></p>%s
+</body></html>
+`, name, name, name, dbBlock)
 }

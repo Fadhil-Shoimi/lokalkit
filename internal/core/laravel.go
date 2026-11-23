@@ -20,8 +20,15 @@ import (
 // Composer/Laravel work runs inside LokalKit (not in a separate console), so
 // the app knows when it finishes or fails and can finish the setup itself.
 
+// DBChoice is the database picked when creating a project.
+type DBChoice struct {
+	Mode string `json:"mode"` // "mysql", "sqlite", "none"; "" = MySQL if running, else SQLite
+	Name string `json:"name"` // MySQL database name (default: project name with _)
+}
+
 type projectTasks struct {
-	kits   map[string]string // project name -> kit it was created with
+	kits   map[string]string   // project name -> kit it was created with
+	dbs    map[string]DBChoice // project name -> database choice
 	mu     sync.Mutex
 	state  map[string]string // project name -> status text while busy
 	errors map[string]string // project name -> last setup error
@@ -38,6 +45,21 @@ func (t *projectTasks) setError(name, msg string) {
 	} else {
 		t.errors[name] = msg
 	}
+}
+
+func (t *projectTasks) rememberDB(name string, db DBChoice) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.dbs == nil {
+		t.dbs = map[string]DBChoice{}
+	}
+	t.dbs[name] = db
+}
+
+func (t *projectTasks) dbFor(name string) DBChoice {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.dbs[name]
 }
 
 func (t *projectTasks) rememberKit(name, kit string) {
@@ -416,19 +438,40 @@ func (m *Manager) setupLaravelEnv(ctx context.Context, name, dir, logFile string
 		"MAIL_USERNAME": "null",
 		"MAIL_PASSWORD": "null",
 	}
+	choice := m.tasks.dbFor(name)
+	dbName := choice.Name
+	if dbName == "" {
+		dbName = filepathSafeDB(name)
+	}
 	mysqlUp := false
-	if s, _ := m.service("mysql"); s.Running() {
-		db := filepathSafeDB(name)
-		if err := s.(*MySQL).Exec("CREATE DATABASE IF NOT EXISTS `" + db + "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"); err != nil {
-			m.Logf("error", "Could not create database %s: %v (keeping SQLite)", db, err)
-		} else {
-			mysqlUp = true
-			for k, v := range map[string]string{
-				"DB_CONNECTION": "mysql", "DB_HOST": "127.0.0.1", "DB_PORT": fmt.Sprint(cfg.MySQLPort),
-				"DB_DATABASE": db, "DB_USERNAME": "root", "DB_PASSWORD": "",
-			} {
-				set[k] = v
+	switch choice.Mode {
+	case "mysql":
+		if err := m.CreateMySQLDatabase(dbName); err != nil {
+			return err
+		}
+		mysqlUp = true
+	case "", "auto":
+		if s, _ := m.service("mysql"); s.Running() {
+			if err := m.CreateMySQLDatabase(dbName); err != nil {
+				m.Logf("error", "Could not create database %s: %v (keeping SQLite)", dbName, err)
+			} else {
+				mysqlUp = true
 			}
+		}
+	}
+	if mysqlUp {
+		for k, v := range map[string]string{
+			"DB_CONNECTION": "mysql", "DB_HOST": "127.0.0.1", "DB_PORT": fmt.Sprint(cfg.MySQLPort),
+			"DB_DATABASE": dbName, "DB_USERNAME": "root", "DB_PASSWORD": "",
+		} {
+			set[k] = v
+		}
+	} else if choice.Mode == "sqlite" {
+		set["DB_CONNECTION"] = "sqlite"
+		sqlite := filepath.Join(dir, "database", "database.sqlite")
+		if !exists(sqlite) {
+			_ = os.MkdirAll(filepath.Dir(sqlite), 0o755)
+			_ = os.WriteFile(sqlite, nil, 0o644)
 		}
 	}
 	env = SetEnvValues(env, set)
@@ -446,7 +489,7 @@ func (m *Manager) setupLaravelEnv(ctx context.Context, name, dir, logFile string
 			return err
 		}
 	}
-	if mysqlUp {
+	if mysqlUp || choice.Mode == "sqlite" {
 		m.tasks.set(name, "Running migrations…")
 		m.emit("projects", m.Projects())
 		cmd, err := m.artisanCmd(ctx, dir, "migrate", "--force", "--no-interaction")
@@ -455,12 +498,48 @@ func (m *Manager) setupLaravelEnv(ctx context.Context, name, dir, logFile string
 		}
 		if err := m.runLogged(name, cmd, logFile); err != nil {
 			m.Logf("error", "Migrations failed for %s: %v", name, err)
+		} else if mysqlUp {
+			m.Logf("ok", "Database %s ready (MySQL), tables created", dbName)
 		} else {
-			m.Logf("ok", "Database %s ready (MySQL)", filepathSafeDB(name))
+			m.Logf("ok", "SQLite database ready, tables created")
 		}
-	} else {
+	} else if choice.Mode == "" {
 		m.Logf("info", "MySQL is not running, so %s keeps Laravel's default SQLite database. Start MySQL and click Repair to switch.", name)
 	}
+	return nil
+}
+
+// ensureMySQL starts LokalKit's MySQL if needed.
+func (m *Manager) ensureMySQL() (*MySQL, error) {
+	svc, _ := m.service("mysql")
+	my := svc.(*MySQL)
+	if !my.Info().Installed {
+		return nil, errors.New("MySQL is not installed. Install it from the Install tab, or choose SQLite")
+	}
+	if !my.Running() {
+		m.Logf("info", "Starting MySQL to create the database...")
+		if err := m.Start("mysql"); err != nil {
+			return nil, err
+		}
+	}
+	return my, nil
+}
+
+var dbNameRe = regexp.MustCompile(`^[A-Za-z0-9_]{1,64}$`)
+
+// CreateMySQLDatabase creates a utf8mb4 database (starting MySQL if needed).
+func (m *Manager) CreateMySQLDatabase(name string) error {
+	if !dbNameRe.MatchString(name) {
+		return fmt.Errorf("database name %q: use letters, numbers and _ (max 64)", name)
+	}
+	my, err := m.ensureMySQL()
+	if err != nil {
+		return err
+	}
+	if err := my.Exec("CREATE DATABASE IF NOT EXISTS `" + name + "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"); err != nil {
+		return fmt.Errorf("could not create database %s: %w", name, err)
+	}
+	m.Logf("ok", "Database %s created (MySQL, user root, no password)", name)
 	return nil
 }
 

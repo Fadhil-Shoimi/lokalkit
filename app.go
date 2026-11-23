@@ -418,11 +418,11 @@ func (a *App) TrustCA() (core.SSLStatus, error) {
 	return a.m.SSLStatus(), err
 }
 
-func (a *App) CreateProject(name, kind string) (core.Project, error) {
+func (a *App) CreateProject(name, kind string, db core.DBChoice) (core.Project, error) {
 	if err := a.ready(); err != nil {
 		return core.Project{}, err
 	}
-	return a.m.CreateProject(name, kind)
+	return a.m.CreateProject(name, kind, db)
 }
 
 func (a *App) OpenURL(url string) { runtime.BrowserOpenURL(a.ctx, url) }

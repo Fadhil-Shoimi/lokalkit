@@ -321,13 +321,35 @@ $('#newProject').addEventListener('submit', async (ev) => {
   const name = $('#npName').value.trim();
   if (!name) return $('#npName').focus();
   const btn = ev.submitter;
-  const p = await run(() => api.CreateProject(name, $('#npKind').value), btn);
+  const db = { mode: $('#npDb').value, name: $('#npDbName').value.trim() };
+  const p = await run(() => api.CreateProject(name, $('#npKind').value, db), btn);
   if (p) {
     $('#npName').value = '';
+    $('#npDbName').value = '';
+    updateDbHint();
     await refreshProjects();
     toast($('#npKind').value.startsWith('laravel') ? `Creating ${p.name} with the latest Laravel… this takes a few minutes` : `Project ${p.name} created → ${p.https || p.url || ''}`);
   }
 });
+
+// Database options under the create form.
+function updateDbHint() {
+  const kind = $('#npKind').value;
+  const mode = $('#npDb').value;
+  const auto = ($('#npName').value || 'project_name').replace(/-/g, '_');
+  $('#npDbName').placeholder = auto;
+  $('#npDbNameWrap').hidden = mode !== 'mysql';
+  const laravel = kind.startsWith('laravel');
+  $('#npDbHint').textContent =
+    mode === 'mysql' ? (laravel ? '· .env is set up and tables (users, sessions…) are created' : '· user root, no password')
+    : mode === 'sqlite' ? (laravel ? '· database/database.sqlite, tables created' : '· use PDO with a .sqlite file')
+    : '';
+}
+$('#npKind').addEventListener('change', updateDbHint);
+$('#npDb').addEventListener('change', updateDbHint);
+$('#npName').addEventListener('input', updateDbHint);
+$('#npDbName').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/[^A-Za-z0-9_]/g, '_'); });
+updateDbHint();
 
 // Only allow characters valid in a domain name while typing.
 $('#npName').addEventListener('input', (e) => {

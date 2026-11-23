@@ -78,7 +78,7 @@ func newTestManager(t *testing.T) *Manager {
 func TestCreateLaravelProject(t *testing.T) {
 	m := newTestManager(t)
 	fakePHP(t, m, false)
-	if _, err := m.CreateProject("shop", "laravel"); err != nil {
+	if _, err := m.CreateProject("shop", "laravel", DBChoice{}); err != nil {
 		t.Fatal(err)
 	}
 	waitTask(t, m, "shop")
@@ -120,7 +120,7 @@ func TestCreateLaravelFailureIsReported(t *testing.T) {
 			logs = append(logs, e.Msg)
 		}
 	}
-	if _, err := m.CreateProject("broken", "laravel"); err != nil {
+	if _, err := m.CreateProject("broken", "laravel", DBChoice{}); err != nil {
 		t.Fatal(err)
 	}
 	waitTask(t, m, "broken")
@@ -145,7 +145,7 @@ func TestSetEnvValues(t *testing.T) {
 func TestRetryAfterFailedCreate(t *testing.T) {
 	m := newTestManager(t)
 	fakePHP(t, m, true)
-	m.CreateProject("again", "laravel")
+	m.CreateProject("again", "laravel", DBChoice{})
 	waitTask(t, m, "again")
 	p := m.findProject("again")
 	if p.Error == "" {
@@ -179,7 +179,7 @@ func TestCreateReactStarterKit(t *testing.T) {
 	fakePHP(t, m, false)
 
 	// Without Node.js: created, but the project says the front-end needs it.
-	m.CreateProject("app", "laravel-react")
+	m.CreateProject("app", "laravel-react", DBChoice{})
 	waitTask(t, m, "app")
 	p := m.findProject("app")
 	if !p.NeedsAssets || !strings.Contains(p.Error, "Node.js") {
@@ -213,9 +213,38 @@ func TestCreateReactStarterKit(t *testing.T) {
 func TestPlainLaravelDoesNotRequireNode(t *testing.T) {
 	m := newTestManager(t)
 	fakePHP(t, m, false)
-	m.CreateProject("plain", "laravel")
+	m.CreateProject("plain", "laravel", DBChoice{})
 	waitTask(t, m, "plain")
 	if p := m.findProject("plain"); p.Error != "" || p.NeedsAssets {
 		t.Fatalf("plain Laravel should be fine without Node.js: %+v", p)
+	}
+}
+
+func TestCreateLaravelWithSQLite(t *testing.T) {
+	m := newTestManager(t)
+	fakePHP(t, m, false)
+	if _, err := m.CreateProject("lite", "laravel", DBChoice{Mode: "sqlite"}); err != nil {
+		t.Fatal(err)
+	}
+	waitTask(t, m, "lite")
+	p := m.findProject("lite")
+	env, _ := os.ReadFile(filepath.Join(p.Path, ".env"))
+	if !strings.Contains(string(env), "DB_CONNECTION=sqlite") || !exists(filepath.Join(p.Path, "database", "database.sqlite")) {
+		t.Fatalf("sqlite not set up: %s", env)
+	}
+}
+
+func TestMySQLChoiceFailsEarlyWithoutMySQL(t *testing.T) {
+	m := newTestManager(t)
+	fakePHP(t, m, false)
+	_, err := m.CreateProject("needsdb", "laravel", DBChoice{Mode: "mysql"})
+	if err == nil || !strings.Contains(err.Error(), "MySQL is not installed") {
+		t.Fatalf("got %v", err)
+	}
+	if exists(filepath.Join(m.P.WWW, "needsdb")) {
+		t.Error("no folder should be created when the database can't be")
+	}
+	if _, err := m.CreateProject("baddb", "blank", DBChoice{Mode: "mysql", Name: "bad-name!"}); err == nil {
+		t.Error("invalid database name should be rejected")
 	}
 }
