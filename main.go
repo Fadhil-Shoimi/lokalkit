@@ -29,11 +29,12 @@ func main() {
 
 	app := NewApp()
 	err := wails.Run(&options.App{
-		Title:     "LokalKit",
-		Width:     980,
-		Height:    680,
-		MinWidth:  760,
-		MinHeight: 520,
+		Title: "LokalKit",
+		// Fixed size that fits the layout (1120px content + margins);
+		// resizing and maximise are turned off on purpose.
+		Width:         1184,
+		Height:        760,
+		DisableResize: true,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
