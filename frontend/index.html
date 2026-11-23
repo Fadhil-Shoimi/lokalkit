@@ -7,35 +7,43 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">
-      <div class="wordmark" role="img" aria-label="LokalKit">
-        <span>L</span><svg class="wm-toggle" viewBox="4 18 56 28" aria-hidden="true"><rect x="4" y="18" width="56" height="28" rx="14" fill="#FACC15"/><circle cx="46" cy="32" r="10" fill="#15171C"/></svg><span>kalKit</span>
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="wordmark" role="img" aria-label="LokalKit">
+          <span>L</span><svg class="wm-toggle" viewBox="4 18 56 28" aria-hidden="true"><rect x="4" y="18" width="56" height="28" rx="14" fill="#FACC15"/><circle cx="46" cy="32" r="10" fill="#15171C"/></svg><span>kalKit</span>
+        </div>
+        <div class="by">by Codeslab</div>
       </div>
-      <div class="by">by Codeslab</div>
-    </div>
-    <div class="top-right">
-      <label class="php-pick" title="PHP version">
-        <span>PHP</span>
-        <select id="phpSelect"></select>
-      </label>
-      <button class="php-update" id="phpUpdate" hidden title="A newer PHP build is available"></button>
-      <span class="ver" id="appVersion"></span>
+      <div class="top-right">
+        <button class="php-update" id="phpUpdate" hidden title="A newer PHP build is available"></button>
+        <div class="php-menu">
+          <button class="php-pick" id="phpBtn" type="button" title="PHP version" aria-haspopup="menu">
+            <span class="lbl">PHP</span><b id="phpCur">–</b><span data-icon="chevron"></span>
+          </button>
+          <div class="popover" id="phpPop" role="menu" hidden></div>
+        </div>
+        <span class="ver" id="appVersion"></span>
+      </div>
     </div>
   </header>
 
   <main>
+   <div class="wrap">
     <div id="fatal" class="fatal" hidden></div>
 
     <section class="services" id="services"></section>
 
     <section class="actions">
       <button class="btn primary" id="btnAll"></button>
-      <button class="btn" data-act="web">🌐 Web</button>
-      <button class="btn" data-act="db">🗄️ Database</button>
-      <button class="btn" data-act="term">⌨️ Terminal</button>
-      <button class="btn" data-act="www">📁 www</button>
-      <button class="btn" data-act="mail">✉️ Mailpit</button>
-      <button class="btn ghost" data-act="reload" title="Regenerate virtual hosts">↻ Reload</button>
+      <div class="toolgroup">
+        <button class="btn" data-act="web" data-icon="globe">Web</button>
+        <button class="btn" data-act="db" data-icon="database">Database</button>
+        <button class="btn" data-act="term" data-icon="terminal">Terminal</button>
+        <button class="btn" data-act="www" data-icon="folder">www</button>
+        <button class="btn" data-act="mail" data-icon="mail">Mailpit</button>
+      </div>
+      <span class="spacer"></span>
+      <button class="btn ghost" data-act="reload" data-icon="refresh" title="Regenerate virtual hosts and restart Apache">Reload</button>
     </section>
 
     <nav class="tabs">
@@ -58,35 +66,43 @@
     </section>
 
     <section class="panel" id="tab-projects">
-      <form class="new-project" id="newProject">
-        <input id="npName" placeholder="new-project-name" autocomplete="off" spellcheck="false"/>
-        <select id="npKind">
-          <option value="blank">Blank PHP</option>
-          <option value="laravel">Laravel</option>
-          <option value="laravel-react">Laravel + React starter kit</option>
-          <option value="laravel-vue">Laravel + Vue starter kit</option>
-          <option value="laravel-livewire">Laravel + Livewire starter kit</option>
-        </select>
-        <button class="btn primary" type="submit">+ Create</button>
-        <button class="btn" type="button" id="btnShowImport" title="Add projects you already have, e.g. from Laragon">Import…</button>
-        <div class="np-db">
-          <label for="npDb">Database</label>
-          <select id="npDb">
-            <option value="mysql">Create a MySQL database</option>
-            <option value="sqlite">SQLite (a file, no server)</option>
-            <option value="none">No database</option>
-          </select>
-          <span id="npDbNameWrap">named <input id="npDbName" spellcheck="false" autocomplete="off" placeholder="project_name"/></span>
-          <span class="muted-text" id="npDbHint"></span>
-        </div>
-      </form>
-      <div class="import-panel" id="importPanel" hidden>
+      <div class="card newproj">
+        <div class="newproj-title">New project</div>
+        <form class="new-project" id="newProject">
+          <div class="np-row">
+            <input id="npName" class="field" placeholder="project-name" autocomplete="off" spellcheck="false"/>
+            <select id="npKind" class="field">
+              <option value="blank">Blank PHP</option>
+              <option value="laravel">Laravel</option>
+              <option value="laravel-react">Laravel + React starter kit</option>
+              <option value="laravel-vue">Laravel + Vue starter kit</option>
+              <option value="laravel-livewire">Laravel + Livewire starter kit</option>
+            </select>
+            <button class="btn primary" type="submit" data-icon="plus">Create</button>
+          </div>
+          <div class="np-db">
+            <label for="npDb">Database</label>
+            <select id="npDb" class="field">
+              <option value="mysql">Create a MySQL database</option>
+              <option value="sqlite">SQLite (a file, no server)</option>
+              <option value="none">No database</option>
+            </select>
+            <span id="npDbNameWrap">named <input id="npDbName" class="field" spellcheck="false" autocomplete="off" placeholder="project_name"/></span>
+            <span class="muted-text" id="npDbHint"></span>
+          </div>
+        </form>
+      </div>
+      <div class="list-head">
+        <h3>Your projects</h3>
+        <button class="btn small" type="button" id="btnShowImport" data-icon="import" title="Add projects you already have, e.g. from Laragon">Import existing…</button>
+      </div>
+      <div class="card import-panel" id="importPanel" hidden>
         <div class="import-head">
           <div><b>Import existing projects</b><div class="muted-text">Projects stay in their current folder. Nothing is copied or moved.</div></div>
           <button type="button" class="btn small ghost" id="btnHideImport">Close</button>
         </div>
         <div class="import-src">
-          <input id="impDir" readonly placeholder="Choose a folder (e.g. C:\laragon\www)"/>
+          <input id="impDir" class="field" readonly placeholder="Choose a folder (e.g. C:\laragon\www)"/>
           <button type="button" class="btn small" id="btnBrowse">Browse…</button>
         </div>
         <div id="impList" class="imp-list"></div>
@@ -109,7 +125,7 @@
 
     <section class="panel" id="tab-logs" hidden>
       <div class="log-tools">
-        <button class="btn small" data-folder="logs">Open logs folder</button>
+        <button class="btn small" data-folder="logs" data-icon="folder">Open logs folder</button>
         <button class="btn small ghost" id="clearLog">Clear view</button>
       </div>
       <div id="logs" class="logs"></div>
@@ -132,7 +148,7 @@
         </fieldset>
         <fieldset>
           <legend>HTTPS (SSL)</legend>
-          <label class="check"><input type="checkbox" name="ssl"/> HTTPS for every project (https://project-name.test)</label>
+          <label class="check"><input type="checkbox" name="ssl"/> HTTPS for every project</label>
           <label>HTTPS port <input type="number" name="sslPort" min="1" max="65535"/></label>
           <div class="ssl-status">
             <span id="sslStatus" class="muted-text"></span>
@@ -154,6 +170,7 @@
         </div>
       </form>
     </section>
+   </div>
   </main>
 
   <div id="toast" class="toast" hidden></div>

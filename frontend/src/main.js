@@ -35,26 +35,54 @@ async function run(fn, btn) {
   }
 }
 
+// ---------- icons (stroke icons, 24x24 grid) ----------
+
+const ICONS = {
+  globe: '<circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+  database: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/>',
+  terminal: '<polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/>',
+  folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+  mail: '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+  refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  import: '<path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M8 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-4"/>',
+  chevron: '<path d="m6 9 6 6 6-6"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',
+  up: '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  code: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
+  play: '<polygon points="6 4 20 12 6 20 6 4"/>',
+  stop: '<rect width="12" height="12" x="6" y="6" rx="2"/>',
+};
+const FILLED = new Set(['play', 'stop']);
+function icon(name) {
+  return `<svg class="ico${FILLED.has(name) ? ' fill' : ''}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
+}
+// Static buttons: <button data-icon="globe">Web</button>
+document.querySelectorAll('[data-icon]').forEach((el) => el.insertAdjacentHTML('afterbegin', icon(el.dataset.icon)));
+
 // ---------- rendering ----------
 
 function renderServices(services) {
   state.services = services;
   $('#services').innerHTML = services.map((s) => {
-    const cls = ['svc', s.running && 'running', s.busy && 'busy'].filter(Boolean).join(' ');
-    const label = s.busy ? '…' : s.running ? 'Stop' : 'Start';
-    const detail = s.installed
-      ? `<div class="svc-name">${esc(s.name)}<small>${esc(s.version)}</small></div>`
-      : `<div><div class="svc-name">${esc(s.name)}</div><div class="svc-missing">Not found. Put it in <code>${esc(s.hint)}</code></div></div>`;
+    const cls = ['card', 'svc', s.running && 'running', s.busy && 'busy'].filter(Boolean).join(' ');
+    const stateLbl = !s.installed ? 'Not installed' : s.busy ? 'Working…' : s.running ? 'Running' : 'Stopped';
+    const ports = String(s.ports || '').split('/').filter(Boolean).map((p) => `<span class="port">:${esc(p)}</span>`).join('');
     const button = s.installed
-      ? `<button class="btn ${s.running ? 'danger' : ''}" data-svc="${s.id}" ${s.busy ? 'disabled' : ''}>${label}</button>`
-      : `<button class="btn small" data-tab-go="install">Install</button>`;
-    return `<div class="${cls}"><span class="dot"></span>${detail}<span class="svc-port">${esc(s.ports)}</span>${button}</div>`;
+      ? `<button class="btn small ${s.running ? 'danger' : ''}" data-svc="${s.id}" ${s.busy ? 'disabled' : ''}>${icon(s.running ? 'stop' : 'play')}${s.busy ? '…' : s.running ? 'Stop' : 'Start'}</button>`
+      : `<button class="btn small primary" data-tab-go="install">${icon('download')}Install</button>`;
+    return `<div class="${cls}">
+      <div class="svc-head"><span class="dot"></span><span class="svc-name">${esc(s.name)}</span><span class="svc-ver">${esc(s.version)}</span><span class="svc-state">${stateLbl}</span></div>
+      <div class="svc-foot">${s.installed ? `<div class="svc-ports">${ports}</div>` : `<div class="svc-missing">Get it from the Install tab</div>`}${button}</div>
+    </div>`;
   }).join('');
 
   const anyRunning = services.some((s) => s.running);
   const anyBusy = services.some((s) => s.busy);
   const all = $('#btnAll');
-  all.textContent = anyRunning ? '■ Stop All' : '▶ Start All';
+  all.innerHTML = anyRunning ? `${icon('stop')}Stop All` : `${icon('play')}Start All`;
   all.disabled = anyBusy;
   all.dataset.mode = anyRunning ? 'stop' : 'start';
 }
@@ -64,11 +92,12 @@ function renderProjects(projects) {
   $('#projCount').hidden = !projects.length;
   const apacheUp = state.services?.find((s) => s.id === 'apache')?.running;
   if (!projects.length) {
-    $('#projects').innerHTML = `<div class="empty">No projects yet. Create one above, or put a folder in <b>www</b>.</div>`;
+    $('#projects').innerHTML = `<div class="empty">No projects yet. Create one above, import from Laragon, or put a folder in <b>www</b>.</div>`;
     return;
   }
   $('#projects').innerHTML = projects.map((p) => `
-    <div class="proj">
+    <div class="card proj">
+      <div class="proj-icon ${p.kind}">${icon(p.kind === 'php' ? 'code' : p.kind === 'laravel' ? 'code' : 'globe')}</div>
       <div class="proj-main">
         <div class="proj-name">${esc(p.name)}${p.kind !== 'php' ? `<span class="badge ${p.kind}">${p.kind}</span>` : ''}${p.linked ? `<span class="badge linked" title="${esc(p.path)}">imported</span>` : ''}</div>
         <div class="proj-links">
@@ -84,33 +113,64 @@ function renderProjects(projects) {
         ${(state.missingHosts || []).includes(p.host) ? `<div class="proj-warn">⚠ Not in the Windows hosts file yet, so browsers can't find it. <button class="linkish" data-fixhosts="1">Fix now</button> or <button class="linkish" data-uselocalhost="1">use .localhost instead</button> (works without the hosts file)</div>` : ''}
       </div>
       <div class="proj-btns">
-        <button class="btn small" data-folder="${esc(p.name)}">Folder</button>
-        <button class="btn small" data-term="${esc(p.path)}">Terminal</button>
-        ${p.linked ? `<button class="btn small ghost" data-unlink="${esc(p.name)}" title="Remove from LokalKit. The files stay where they are.">Remove</button>` : ''}
+        <button class="btn small" data-folder="${esc(p.name)}" title="Open folder">${icon('folder')}Folder</button>
+        <button class="btn small" data-term="${esc(p.path)}" title="Open a terminal here">${icon('terminal')}Terminal</button>
+        ${p.linked ? `<button class="btn small ghost" data-unlink="${esc(p.name)}" title="Remove from LokalKit. The files stay where they are.">${icon('x')}Remove</button>` : ''}
       </div>
     </div>`).join('');
 }
 
+// Branches still supported by the PHP project (older ones go under "Older").
+const SUPPORTED_FROM = '8.2';
+let phpShowOlder = false;
+
 function renderPHP() {
-  const sel = $('#phpSelect');
-  if (!state.php?.length) {
-    sel.innerHTML = '<option>not found</option>';
-    sel.disabled = true;
-    return;
-  }
-  sel.disabled = phpInstalling;
-  const installed = state.php.map((p) =>
-    `<option value="${esc(p.name)}" ${p.name === state.currentPhp ? 'selected' : ''}>${esc(p.version)}${p.ts ? '' : ' (NTS)'}</option>`).join('');
-  // Branches you don't have yet, offered for download.
-  const have = new Set(state.php.map((p) => branchOf(p.version)));
-  const extra = (phpUpdates.releases || []).filter((r) => !have.has(r.branch));
-  sel.innerHTML = installed + (extra.length
-    ? `<optgroup label="Download">${extra.map((r) => `<option value="dl:${esc(r.branch)}">PHP ${esc(r.version)} ↓</option>`).join('')}</optgroup>`
-    : '');
+  const cur = state.php?.find((p) => p.name === state.currentPhp);
+  $('#phpCur').textContent = cur ? cur.version : (state.php?.length ? '–' : 'not found');
+  $('#phpBtn').disabled = phpInstalling;
   const up = $('#phpUpdate');
   up.hidden = !phpUpdates.update && !phpInstalling;
   up.disabled = phpInstalling;
-  if (!phpInstalling && phpUpdates.update) up.textContent = `↑ ${phpUpdates.update.version}`;
+  if (!phpInstalling && phpUpdates.update) up.innerHTML = `${icon('up')}PHP ${esc(phpUpdates.update.version)}`;
+  if (!$('#phpPop').hidden) renderPHPMenu();
+}
+
+function renderPHPMenu() {
+  const have = new Set((state.php || []).map((p) => branchOf(p.version)));
+  const rel = (phpUpdates.releases || []).filter((r) => !have.has(r.branch));
+  const supported = rel.filter((r) => cmpVer(r.branch, SUPPORTED_FROM) >= 0);
+  const older = rel.filter((r) => cmpVer(r.branch, SUPPORTED_FROM) < 0);
+  let h = '<div class="pop-head">Installed</div>';
+  h += (state.php || []).map((p) => `<button class="pop-item ${p.name === state.currentPhp ? 'current' : ''}" data-php-use="${esc(p.name)}">
+      ${p.name === state.currentPhp ? icon('check') : '<span class="ico"></span>'}<span class="grow">PHP ${esc(p.version)}</span>${p.ts ? '' : '<small>NTS</small>'}</button>`).join('')
+    || '<div class="pop-item pop-more">None yet</div>';
+  if (phpUpdates.update) {
+    h += `<div class="pop-sep"></div><button class="pop-item update" data-php-dl="${esc(phpUpdates.update.branch)}">${icon('up')}<span class="grow">Update to PHP ${esc(phpUpdates.update.version)}</span></button>`;
+  }
+  if (supported.length || older.length) h += '<div class="pop-sep"></div><div class="pop-head">Download</div>';
+  h += supported.map((r) => `<button class="pop-item" data-php-dl="${esc(r.branch)}">${icon('download')}<span class="grow">PHP ${esc(r.version)}</span></button>`).join('');
+  if (older.length) {
+    h += phpShowOlder
+      ? older.map((r) => `<button class="pop-item" data-php-dl="${esc(r.branch)}">${icon('download')}<span class="grow">PHP ${esc(r.version)}</span><small>end of life</small></button>`).join('')
+      : `<button class="pop-item pop-more" data-php-older="1"><span class="ico"></span><span class="grow">Older versions (no longer supported)…</span></button>`;
+  }
+  if (phpUpdates.error) h += `<div class="pop-sep"></div><div class="pop-item pop-more">Couldn't check for downloads</div>`;
+  $('#phpPop').innerHTML = h;
+}
+
+const cmpVer = (a, b) => {
+  const pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d) return d;
+  }
+  return 0;
+};
+
+function togglePHPMenu(show) {
+  const pop = $('#phpPop');
+  pop.hidden = show === undefined ? !pop.hidden : !show;
+  if (!pop.hidden) renderPHPMenu();
 }
 
 let phpUpdates = {};
@@ -130,6 +190,7 @@ async function installPHP(branch, label) {
   phpInstalling = true;
   $('#phpUpdate').hidden = false;
   $('#phpUpdate').textContent = `Downloading PHP ${branch}…`;
+  togglePHPMenu(false);
   renderPHP();
   try {
     await api.InstallPHP(branch);
@@ -224,7 +285,7 @@ function renderComponents() {
       if (p.phase === 'downloading') msg = `Downloading ${p.version && p.version !== 'latest' ? esc(p.version) + ' ' : ''}· ${fmtMB(p.received)}${p.total > 0 ? ' / ' + fmtMB(p.total) + ` (${pct}%)` : ''}`;
       prog = `<div class="comp-progress">${bar}<span class="comp-msg ${p.phase === 'error' ? 'err' : ''}">${msg}</span></div>`;
     }
-    return `<label class="comp">
+    return `<label class="card comp">
       <input type="checkbox" value="${c.id}" ${isChecked ? 'checked' : ''} ${installing ? 'disabled' : ''}/>
       <div><div class="comp-name">${esc(c.name)}</div><div class="comp-desc">${esc(c.description)}</div></div>
       ${state}${prog}
@@ -360,15 +421,27 @@ $('#phpUpdate').addEventListener('click', () => {
   if (phpUpdates.update) installPHP(phpUpdates.update.branch, `PHP ${phpUpdates.update.version}`);
 });
 
-$('#phpSelect').addEventListener('change', async (e) => {
-  if (e.target.value.startsWith('dl:')) {
-    const branch = e.target.value.slice(3);
-    const r = (phpUpdates.releases || []).find((x) => x.branch === branch);
-    return installPHP(branch, `PHP ${r ? r.version : branch}`);
+$('#phpBtn').addEventListener('click', (e) => { e.stopPropagation(); togglePHPMenu(); });
+document.addEventListener('click', (e) => { if (!e.target.closest('.php-menu')) togglePHPMenu(false); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') togglePHPMenu(false); });
+$('#phpPop').addEventListener('click', async (e) => {
+  e.stopPropagation();
+  const t = e.target.closest('button');
+  if (!t) return;
+  if (t.dataset.phpOlder) { phpShowOlder = true; return renderPHPMenu(); }
+  if (t.dataset.phpDl) {
+    const r = (phpUpdates.releases || []).find((x) => x.branch === t.dataset.phpDl);
+    return installPHP(t.dataset.phpDl, `PHP ${r ? r.version : t.dataset.phpDl}`);
   }
-  const cfg = { ...state.config, phpVersion: e.target.value };
-  const ok = await run(async () => { await api.SaveConfig(cfg); return true; });
-  if (ok) { state.config = cfg; toast('PHP version changed'); } else renderPHP();
+  if (t.dataset.phpUse && t.dataset.phpUse !== state.currentPhp) {
+    togglePHPMenu(false);
+    const cfg = { ...state.config, phpVersion: t.dataset.phpUse };
+    const ok = await run(async () => { await api.SaveConfig(cfg); return true; });
+    if (ok) {
+      state.config = cfg; state.currentPhp = t.dataset.phpUse; renderPHP();
+      toast('PHP version changed. Apache restarts to use it.');
+    }
+  } else togglePHPMenu(false);
 });
 
 $('#settings').addEventListener('submit', async (ev) => {
