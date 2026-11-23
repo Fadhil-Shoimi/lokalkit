@@ -189,4 +189,3 @@ func TestProcLifecycle(t *testing.T) {
 		t.Error("should be stopped with expected=true")
 	}
 }
-

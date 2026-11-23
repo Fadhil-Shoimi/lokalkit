@@ -9,7 +9,7 @@ import (
 )
 
 type PHPInstall struct {
-	Name      string `json:"name"`    // folder name, e.g. php-8.3.30-Win32-vs16-x64
+	Name      string `json:"name"` // folder name, e.g. php-8.3.30-Win32-vs16-x64
 	Dir       string `json:"dir"`
 	Version   string `json:"version"` // e.g. 8.3.30
 	TS        bool   `json:"ts"`      // thread safe: needed for Apache module
