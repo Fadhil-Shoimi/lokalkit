@@ -69,6 +69,13 @@ You can keep several PHP versions in `bin\php\` and pick one from the menu at th
 
 The first time Apache starts with projects, Windows asks for admin rights (UAC) to update the hosts file. This is expected.
 
+## Project domains: `.test` or `.localhost`
+
+- **`.test`** (default) needs entries in the Windows hosts file. LokalKit adds them for you (Windows asks for admin rights).
+- **`.localhost`** needs **no hosts file at all**: Edge, Chrome and Firefox send `anything.localhost` to your own computer by themselves. Pick it in **Settings → Virtual host → Domain**, or click **use .localhost instead** on a project that shows a hosts warning.
+
+If a project shows **"Not in the Windows hosts file yet"** and **Fix now** fails, an antivirus "hosts file protection" feature is the usual cause. Switch to `.localhost`, or allow LokalKit in your antivirus.
+
 ## HTTPS (SSL)
 
 When Apache starts with HTTPS on (the default), LokalKit:

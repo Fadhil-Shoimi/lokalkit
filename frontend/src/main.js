@@ -77,7 +77,7 @@ function renderProjects(projects) {
                <a class="proj-url alt" data-url="${esc(p.url)}">http</a>`
             : `<a class="proj-url" data-url="${esc(p.url)}" title="${apacheUp ? 'Open in browser' : 'Start Apache first'}">${esc(p.url)}</a>`}
         </div>
-        ${(state.missingHosts || []).includes(p.host) ? `<div class="proj-warn">⚠ Not in the Windows hosts file yet, so browsers can't find it. <button class="linkish" data-fixhosts="1">Fix now</button></div>` : ''}
+        ${(state.missingHosts || []).includes(p.host) ? `<div class="proj-warn">⚠ Not in the Windows hosts file yet, so browsers can't find it. <button class="linkish" data-fixhosts="1">Fix now</button> or <button class="linkish" data-uselocalhost="1">use .localhost instead</button> (works without the hosts file)</div>` : ''}
       </div>
       <div class="proj-btns">
         <button class="btn small" data-folder="${esc(p.name)}">Folder</button>
@@ -227,6 +227,12 @@ document.addEventListener('click', (ev) => {
       state.missingHosts = await api.FixHosts();
       renderProjects(state.projects);
       if (!state.missingHosts.length) toast('Hosts file updated. Reload the page in your browser.');
+    }, t);
+  } else if (t.dataset.uselocalhost) {
+    run(async () => {
+      await api.UseLocalhostDomain();
+      await refresh();
+      toast('Done. Your projects now open at https://name.localhost');
     }, t);
   } else if (t.dataset.folder) {
     run(() => api.OpenFolder(t.dataset.folder));

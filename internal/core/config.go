@@ -47,7 +47,6 @@ var blockedTLDs = map[string]string{
 	"com": "a real domain", "net": "a real domain", "org": "a real domain",
 	"my": "a real domain", "io": "a real domain",
 	"dev": "browsers force HTTPS (HSTS)", "app": "browsers force HTTPS (HSTS)",
-	"localhost": "reserved",
 }
 
 func (c Config) Validate() error {

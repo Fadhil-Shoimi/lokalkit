@@ -205,6 +205,9 @@ func BuildHostsFile(current string, hosts []string) string {
 	for len(kept) > 0 && strings.TrimSpace(kept[len(kept)-1]) == "" {
 		kept = kept[:len(kept)-1]
 	}
+	if len(kept) == 0 && len(hosts) == 0 {
+		return ""
+	}
 	if len(hosts) > 0 {
 		kept = append(kept, "", hostsBegin)
 		for _, h := range hosts {
@@ -228,21 +231,29 @@ func SyncHostsFile(hosts []string) (changed bool, err error) {
 	if want == string(cur) {
 		return false, nil
 	}
-	// A read-only hosts file (set by some "protection" tools) blocks writes
-	// even for admins; on Windows Chmod clears the read-only attribute.
-	if st, err := os.Stat(path); err == nil && st.Mode().Perm()&0o200 == 0 {
-		_ = os.Chmod(path, 0o644)
-	}
-	if err := os.WriteFile(path, []byte(want), 0o644); err != nil {
-		if errors.Is(err, fs.ErrPermission) {
+	if err := writeHostsFile(path, []byte(want)); err != nil {
+		if errors.Is(err, fs.ErrPermission) && !processElevated() {
 			return true, ErrNeedAdmin
 		}
-		return true, err
+		return true, errors.New(describeHostsWriteError(err))
 	}
 	return true, nil
 }
 
+// UsesLocalhostTLD: browsers resolve *.localhost to this computer by
+// themselves, so no hosts file entries (and no admin prompt) are needed.
+func (m *Manager) UsesLocalhostTLD() bool { return m.config().TLD == "localhost" }
+
+// hostNames are the names that need a hosts file entry.
 func (m *Manager) hostNames() []string {
+	if m.UsesLocalhostTLD() {
+		return nil
+	}
+	return m.projectHosts()
+}
+
+// projectHosts are all project domains (for vhosts and the certificate).
+func (m *Manager) projectHosts() []string {
 	if !m.config().AutoVhost {
 		return nil
 	}
@@ -256,6 +267,9 @@ func (m *Manager) hostNames() []string {
 // SyncHosts updates the hosts file, asking Windows for admin rights (UAC)
 // only when something actually changed.
 func (m *Manager) SyncHosts() error {
+	if m.UsesLocalhostTLD() {
+		return nil // browsers resolve *.localhost themselves; leave the hosts file alone
+	}
 	changed, err := SyncHostsFile(m.hostNames())
 	if err == nil {
 		if changed {
@@ -292,10 +306,10 @@ func (m *Manager) SyncHosts() error {
 	if detail == "" {
 		detail = "unknown reason"
 	}
-	return fmt.Errorf("could not add your projects to the hosts file (%s). %s", detail, manualHostsHint)
+	return fmt.Errorf("could not add your projects to the hosts file: %s. %s", detail, manualHostsHint)
 }
 
-const manualHostsHint = `You can add them by hand: open Notepad as administrator, open C:\Windows\System32\drivers\etc\hosts and add a line like "127.0.0.1 project.test" for each project`
+const manualHostsHint = `Easiest fix: switch the domain to .localhost in Settings (no hosts file needed). Or add them by hand: open Notepad as administrator, open C:\Windows\System32\drivers\etc\hosts and add "127.0.0.1 project.test" for each project`
 
 // MissingFromHosts returns project hosts that the hosts file does not map yet.
 func (m *Manager) MissingFromHosts() []string {

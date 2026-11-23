@@ -315,3 +315,28 @@ func TestWatchProjectsReloads(t *testing.T) {
 		}
 	}
 }
+
+func TestLocalhostTLD(t *testing.T) {
+	root := t.TempDir()
+	hostsPathOverride = filepath.Join(t.TempDir(), "hosts")
+	t.Cleanup(func() { hostsPathOverride = "" })
+	m, _ := NewManager(root, nil)
+	cfg := m.Config()
+	cfg.TLD = "localhost"
+	if _, err := m.SaveConfig(cfg); err != nil {
+		t.Fatalf("localhost TLD should be allowed: %v", err)
+	}
+	os.MkdirAll(filepath.Join(m.P.WWW, "shop"), 0o755)
+	if len(m.MissingFromHosts()) != 0 || len(m.hostNames()) != 0 {
+		t.Error(".localhost must not need hosts entries")
+	}
+	if hs := m.projectHosts(); len(hs) != 1 || hs[0] != "shop.localhost" {
+		t.Errorf("project hosts: %v", hs)
+	}
+	if err := m.SyncHosts(); err != nil || exists(hostsPathOverride) {
+		t.Errorf("hosts file should be left alone: %v", err)
+	}
+	if p := m.Projects()[0]; p.HTTPS != "https://shop.localhost" {
+		t.Errorf("url %q", p.HTTPS)
+	}
+}

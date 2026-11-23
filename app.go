@@ -17,14 +17,14 @@ const AppVersion = "0.1.0"
 // App is the bridge between the Go engine and the web UI.
 // Every exported method is callable from JavaScript.
 type App struct {
-	ctx      context.Context
-	m        *core.Manager
-	initErr  string
-	tray     *tray.Tray
-	inst     *installer.Installer
+	ctx       context.Context
+	m         *core.Manager
+	initErr   string
+	tray      *tray.Tray
+	inst      *installer.Installer
 	stopWatch chan struct{}
-	quitting bool // true when quitting for real (tray "Quit"), not hiding
-	hidTold  bool // already told the user the app keeps running in the tray
+	quitting  bool // true when quitting for real (tray "Quit"), not hiding
+	hidTold   bool // already told the user the app keeps running in the tray
 }
 
 func NewApp() *App { return &App{} }
@@ -284,6 +284,21 @@ func (a *App) FixHosts() ([]string, error) {
 	}
 	err := a.m.SyncHosts()
 	return a.m.MissingFromHosts(), err
+}
+
+// UseLocalhostDomain switches project domains to name.localhost, which
+// browsers resolve by themselves (no hosts file, no admin prompt).
+func (a *App) UseLocalhostDomain() error {
+	if err := a.ready(); err != nil {
+		return err
+	}
+	cfg := a.m.Config()
+	cfg.TLD = "localhost"
+	if _, err := a.m.SaveConfig(cfg); err != nil {
+		return err
+	}
+	a.m.Logf("ok", "Project domains now end in .localhost (no hosts file needed)")
+	return a.m.Reload()
 }
 
 // TrustCA asks Windows to trust the LokalKit certificate authority.

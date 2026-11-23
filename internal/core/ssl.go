@@ -177,12 +177,12 @@ func (m *Manager) prepareSSL(apacheDir string) (*SSLFiles, error) {
 	if created {
 		m.Logf("info", "LokalKit CA created: %s", filepath.Join(dir, caFile))
 	}
-	changed, err := EnsureServerCert(dir, ca, caKey, ServerNames(m.hostNames()))
+	changed, err := EnsureServerCert(dir, ca, caKey, ServerNames(m.projectHosts()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create certificate: %w", err)
 	}
 	if changed {
-		m.Logf("info", "HTTPS certificate issued for %d project(s)", len(m.hostNames()))
+		m.Logf("info", "HTTPS certificate issued for %d project(s)", len(m.projectHosts()))
 	}
 	if !m.trustAsked {
 		m.trustAsked = true

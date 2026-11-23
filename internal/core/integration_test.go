@@ -20,6 +20,12 @@ import (
 // CA + certificate, PHP) against a Linux Apache, then fetches pages over
 // HTTP and HTTPS. Run with: LOKALKIT_IT=1 go test -run Integration ./internal/core
 func TestApacheIntegration(t *testing.T) {
+	for _, tld := range []string{"test", "localhost"} {
+		t.Run(tld, func(t *testing.T) { runApacheIntegration(t, tld) })
+	}
+}
+
+func runApacheIntegration(t *testing.T, tld string) {
 	if os.Getenv("LOKALKIT_IT") == "" || runtime.GOOS != "linux" {
 		t.Skip("set LOKALKIT_IT=1 on Linux with apache2 + libapache2-mod-php")
 	}
@@ -59,6 +65,7 @@ func TestApacheIntegration(t *testing.T) {
 
 	cfg := DefaultConfig()
 	cfg.ApachePort, cfg.SSLPort = freePort(t), freePort(t)
+	cfg.TLD = tld
 	SaveConfig(filepath.Join(root, "lokalkit.json"), cfg)
 
 	m, err := NewManager(root, func(ev string, d any) {
@@ -115,7 +122,7 @@ func TestApacheIntegration(t *testing.T) {
 	if body := get(prj.HTTPS); !strings.HasPrefix(body, "kedai ok 8 on") {
 		t.Errorf("https body: %q", body)
 	}
-	if body := get(strings.Replace(prj.HTTPS, "kedai.test", "api.kedai.test", 1)); !strings.HasPrefix(body, "kedai ok") {
+	if body := get(strings.Replace(prj.HTTPS, "kedai.", "api.kedai.", 1)); !strings.HasPrefix(body, "kedai ok") {
 		t.Errorf("wildcard subdomain body: %q", body)
 	}
 
