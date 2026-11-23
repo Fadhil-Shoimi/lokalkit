@@ -6,6 +6,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"path/filepath"
+	"strings"
+	"syscall"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -101,4 +104,60 @@ func killTree(pid int) {
 		}
 	}
 	kill(uint32(pid), 0)
+}
+
+var (
+	user32                  = windows.NewLazySystemDLL("user32.dll")
+	procShowWindow          = user32.NewProc("ShowWindow")
+	procSetForegroundWindow = user32.NewProc("SetForegroundWindow")
+	procIsIconic            = user32.NewProc("IsIconic")
+)
+
+// runningPIDs returns the process IDs of running programs named like exe
+// (e.g. dbeaver.exe).
+func runningPIDs(exe string) []uint32 {
+	name := strings.ToLower(filepath.Base(exe))
+	snap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
+	if err != nil {
+		return nil
+	}
+	defer windows.CloseHandle(snap)
+	var e windows.ProcessEntry32
+	e.Size = uint32(unsafe.Sizeof(e))
+	var pids []uint32
+	for err := windows.Process32First(snap, &e); err == nil; err = windows.Process32Next(snap, &e) {
+		if strings.ToLower(windows.UTF16ToString(e.ExeFile[:])) == name {
+			pids = append(pids, e.ProcessID)
+		}
+	}
+	return pids
+}
+
+// focusProcess brings a visible window of one of pids to the front,
+// restoring it if minimised. Returns false when none was found.
+func focusProcess(pids []uint32) bool {
+	want := map[uint32]bool{}
+	for _, p := range pids {
+		want[p] = true
+	}
+	var found windows.HWND
+	cb := syscall.NewCallback(func(h windows.HWND, _ uintptr) uintptr {
+		var pid uint32
+		windows.GetWindowThreadProcessId(h, &pid)
+		if want[pid] && windows.IsWindowVisible(h) {
+			found = h
+			return 0 // stop
+		}
+		return 1
+	})
+	_ = windows.EnumWindows(cb, nil)
+	if found == 0 {
+		return false
+	}
+	const swRestore = 9
+	if r, _, _ := procIsIconic.Call(uintptr(found)); r != 0 {
+		procShowWindow.Call(uintptr(found), swRestore)
+	}
+	procSetForegroundWindow.Call(uintptr(found))
+	return true
 }

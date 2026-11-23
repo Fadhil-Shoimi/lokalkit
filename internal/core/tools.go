@@ -118,6 +118,16 @@ func (m *Manager) OpenDatabase() (url string, err error) {
 		}
 	}
 	if dbeaver := findUnder(filepath.Join(m.P.Bin, "dbeaver"), exeName("dbeaver")); dbeaver != "" {
+		// Already open? Bring it to the front instead of starting a second
+		// DBeaver, which fails with "Can't lock workspace".
+		if pids := runningPIDs(dbeaver); len(pids) > 0 {
+			if focusProcess(pids) {
+				m.Logf("info", "DBeaver is already open; brought it to the front")
+			} else {
+				m.Logf("info", "DBeaver is already running (still starting?)")
+			}
+			return "", nil
+		}
 		cmd := exec.Command(dbeaver, DBeaverArgs(m.config().MySQLPort, dbeaverHasConnection())...)
 		cmd.Dir = filepath.Dir(dbeaver)
 		if err := cmd.Start(); err != nil {
