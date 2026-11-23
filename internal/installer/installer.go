@@ -68,6 +68,7 @@ func New(root string, detect Detector, onProgress func(Progress)) *Installer {
 			"composer": ResolveComposer,
 			"adminer":  ResolveAdminer,
 			"nodejs":   ResolveNode,
+			"dbeaver":  ResolveDBeaver,
 			"vcredist": func(_ context.Context, s Sources) (Artifact, error) {
 				return Artifact{Version: "latest", Kind: "run", Name: "vc_redist.x64.exe", URLs: []string{s.VCRedistURL}}, nil
 			},
@@ -83,6 +84,7 @@ var catalog = []Component{
 	{ID: "mailpit", Name: "Mailpit", Description: "Catches emails sent by your apps", Recommended: true},
 	{ID: "composer", Name: "Composer", Description: "PHP package manager (needed for Laravel)", Recommended: true},
 	{ID: "nodejs", Name: "Node.js", Description: "JavaScript runtime (LTS), builds the front-end of Laravel starter kits", Recommended: true},
+	{ID: "dbeaver", Name: "DBeaver Community", Description: "Full database manager (free, similar to Navicat). About 130 MB, Java included"},
 	{ID: "adminer", Name: "Adminer", Description: "Database manager in the browser (http://localhost/adminer/)"},
 }
 
@@ -102,6 +104,8 @@ func (in *Installer) Components() []Component {
 			c.Installed = fileExists(filepath.Join(in.Root, "etc", "apps", "adminer", "index.php"))
 		case "nodejs":
 			c.Installed, c.Version = nodeInstalled(in.Root)
+		case "dbeaver":
+			c.Installed, c.Version = appInstalled(in.Root, "dbeaver", "dbeaver", "dbeaver-")
 		default:
 			if in.Detect != nil {
 				c.Installed, c.Version = in.Detect(c.ID)
@@ -510,5 +514,26 @@ func nodeInstalled(root string) (bool, string) {
 	}
 	v := filepath.Base(filepath.Dir(matches[len(matches)-1]))
 	v = strings.TrimSuffix(strings.TrimPrefix(v, "node-v"), "-win-x64")
+	return true, v
+}
+
+// appInstalled looks for bin/<dir>/<folder>[/<sub>]/<exe>.exe and returns the
+// version taken from the folder name (after prefix).
+func appInstalled(root, dir, exe, prefix string) (bool, string) {
+	if runtime.GOOS == "windows" {
+		exe += ".exe"
+	}
+	matches, _ := filepath.Glob(filepath.Join(root, "bin", dir, "*", exe))
+	deeper, _ := filepath.Glob(filepath.Join(root, "bin", dir, "*", "*", exe))
+	matches = append(matches, deeper...)
+	if len(matches) == 0 {
+		return false, ""
+	}
+	rel, _ := filepath.Rel(filepath.Join(root, "bin", dir), matches[len(matches)-1])
+	first := strings.SplitN(filepath.ToSlash(rel), "/", 2)[0]
+	v := strings.TrimPrefix(first, prefix)
+	if v == first {
+		v = ""
+	}
 	return true, v
 }

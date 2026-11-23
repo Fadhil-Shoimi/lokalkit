@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 // toolDirs are the folders added to PATH in LokalKit terminals.
@@ -97,6 +98,16 @@ func OpenPath(p string) error {
 // OpenDatabase launches HeidiSQL if available; otherwise returns the
 // Adminer URL for the caller to open in the browser.
 func (m *Manager) OpenDatabase() (url string, err error) {
+	if dbeaver := findUnder(filepath.Join(m.P.Bin, "dbeaver"), exeName("dbeaver")); dbeaver != "" {
+		cmd := exec.Command(dbeaver, DBeaverArgs(m.config().MySQLPort)...)
+		cmd.Dir = filepath.Dir(dbeaver)
+		if err := cmd.Start(); err != nil {
+			return "", err
+		}
+		go func() { _ = cmd.Wait() }()
+		m.Logf("info", "Opening DBeaver (connection \"LokalKit MySQL\")...")
+		return "", nil
+	}
 	if heidi := findUnder(filepath.Join(m.P.Bin, "heidisql"), exeName("heidisql")); heidi != "" {
 		cfg := m.config()
 		cmd := exec.Command(heidi, "-h=127.0.0.1", "-u=root", fmt.Sprintf("-P=%d", cfg.MySQLPort))
@@ -109,7 +120,27 @@ func (m *Manager) OpenDatabase() (url string, err error) {
 	if exists(filepath.Join(m.adminerDir(), "index.php")) {
 		return m.LocalURL("/adminer/"), nil
 	}
-	return "", errors.New("no database tool found. Put HeidiSQL in bin\\heidisql or adminer.php at etc\\apps\\adminer\\index.php")
+	return "", errors.New("no database tool found. Install DBeaver or Adminer from the Install tab")
+}
+
+// DBeaverArgs opens DBeaver with a saved "LokalKit MySQL" connection
+// (created on first use, reused afterwards) and connects to it.
+func DBeaverArgs(mysqlPort int) []string {
+	con := strings.Join([]string{
+		"id=lokalkit-mysql",
+		"name=LokalKit MySQL",
+		"driver=mysql",
+		"host=127.0.0.1",
+		fmt.Sprintf("port=%d", mysqlPort),
+		"user=root",
+		"password=",
+		"savePassword=true",
+		"prop.allowPublicKeyRetrieval=true",
+		"prop.useSSL=false",
+		"save=true",
+		"connect=true",
+	}, "|")
+	return []string{"-nosplash", "-con", con}
 }
 
 func (m *Manager) adminerDir() string { return filepath.Join(m.P.Etc, "apps", "adminer") }

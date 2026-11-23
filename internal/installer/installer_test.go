@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -73,6 +74,12 @@ func fakeSites(t *testing.T) (*httptest.Server, Sources) {
 		fmt.Fprintf(w, "aaaa  node-v26.13.1-linux-x64.tar.gz\n%s  node-v26.13.1-win-x64.zip\n", sum(nodeZip))
 	})
 	mux.HandleFunc("/node/v26.13.1/node-v26.13.1-win-x64.zip", func(w http.ResponseWriter, r *http.Request) { w.Write(nodeZip) })
+	dbeaverZip := makeZip(t, map[string]string{"dbeaver/dbeaver.exe": "dbeaver", "dbeaver/jre/bin/java.exe": "java"})
+	mux.HandleFunc("/dbeaver/version.xml", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `<?xml version="1.0"?><version><number>26.2.5</number><date>2026-11-17</date></version>`)
+	})
+	mux.HandleFunc("/dbeaver/latest.zip", func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) }) // force the mirror
+	mux.HandleFunc("/gh/26.2.5/dbeaver-ce-26.2.5-win32.win32.x86_64.zip", func(w http.ResponseWriter, r *http.Request) { w.Write(dbeaverZip) })
 	mux.HandleFunc("/adminer.php", func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, "<?php // adminer") })
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -83,6 +90,8 @@ func fakeSites(t *testing.T) (*httptest.Server, Sources) {
 		MySQLVersion: "8.4.3", MySQLURLs: []string{u + "/mysql/broken.zip", u + "/mysql/mysql-8.4.3-winx64.zip"},
 		MailpitURL: u + "/mailpit.zip", ComposerURL: u + "/composer.phar", ComposerSHA256: u + "/composer.phar.sha256",
 		AdminerURL: u + "/adminer.php", NodeIndex: u + "/node/index.json", NodeBase: u + "/node/",
+		DBeaverURL: u + "/dbeaver/latest.zip", DBeaverVersion: u + "/dbeaver/version.xml",
+		DBeaverGitHub: u + "/gh/%s/dbeaver-ce-%s-win32.win32.x86_64.zip",
 	}
 }
 
@@ -114,7 +123,7 @@ func TestInstallEverything(t *testing.T) {
 		mu.Unlock()
 	})
 	in.sources = &s
-	if err := in.Install([]string{"adminer", "composer", "mailpit", "mysql", "php", "apache", "nodejs"}); err != nil {
+	if err := in.Install([]string{"adminer", "composer", "mailpit", "mysql", "php", "apache", "nodejs", "dbeaver"}); err != nil {
 		t.Fatal(err)
 	}
 	for _, f := range []string{
@@ -125,6 +134,7 @@ func TestInstallEverything(t *testing.T) {
 		"bin/composer/composer.phar",
 		"etc/apps/adminer/index.php",
 		"bin/nodejs/node-v26.13.1-win-x64/node-v26.13.1-win-x64/node_modules/npm/bin/npm-cli.js",
+		"bin/dbeaver/dbeaver-26.2.5/dbeaver/jre/bin/java.exe",
 	} {
 		if !fileExists(filepath.Join(root, filepath.FromSlash(f))) {
 			t.Errorf("missing %s", f)
@@ -226,4 +236,17 @@ func TestResolveRealSources(t *testing.T) {
 		t.Fatalf("node: %+v %v", a, err)
 	}
 	t.Logf("node: %s %s", a.Version, a.URLs[0])
+}
+
+func TestDBeaverDetected(t *testing.T) {
+	root := t.TempDir()
+	exe := "dbeaver"
+	if runtime.GOOS == "windows" {
+		exe += ".exe"
+	}
+	os.MkdirAll(filepath.Join(root, "bin", "dbeaver", "dbeaver-26.2.5", "dbeaver"), 0o755)
+	os.WriteFile(filepath.Join(root, "bin", "dbeaver", "dbeaver-26.2.5", "dbeaver", exe), nil, 0o644)
+	if ok, v := appInstalled(root, "dbeaver", "dbeaver", "dbeaver-"); !ok || v != "26.2.5" {
+		t.Fatalf("got %v %q", ok, v)
+	}
 }

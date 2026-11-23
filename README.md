@@ -16,7 +16,7 @@ A local PHP development environment for Windows. **Apache + PHP + MySQL + Mailpi
 - Switch PHP versions. `php.ini` is generated for you with the common extensions enabled
 - MySQL is initialized on first start (`root`, no password)
 - PHP `mail()` goes straight to Mailpit
-- Quick buttons: Web, Database (HeidiSQL/Adminer), Terminal (PHP, Composer and MySQL on PATH), www folder
+- Quick buttons: Web, Database (opens DBeaver with a ready "LokalKit MySQL" connection, else HeidiSQL or Adminer), Terminal (PHP, Composer and MySQL on PATH), www folder
 - Create new projects: blank PHP, **Laravel**, or Laravel with the official **React, Vue or Livewire starter kit** (always the latest, from each kit's main branch like the Laravel installer). Composer runs inside LokalKit with progress on the project; the kit's own setup steps run, `.env` is prepared (HTTPS `APP_URL`, MySQL database + migrations when MySQL is running, Mailpit), and the front-end is built with `npm install` + `npm run build`. Projects with missing packages or an unbuilt front-end get a **Repair / Build now** button
 - **System tray**: a switch icon in the taskbar (yellow = services running, grey = stopped). Click to open, right-click to start/stop services and for shortcuts. The X button hides the app to the tray (configurable in Settings)
 - **One-click installer**: download Apache, PHP, MySQL, Mailpit, Composer, Adminer and the Visual C++ Runtime from their official sites, with SHA-256 checks where the source publishes them
@@ -119,6 +119,7 @@ After that, `https://project.test` works without warnings in Chrome and Edge.
 | Mailpit | latest GitHub release | |
 | Composer | `getcomposer.org` latest stable | SHA-256 |
 | Node.js | newest LTS Windows x64 zip from `nodejs.org/dist/index.json` | SHA-256 |
+| DBeaver Community (optional) | `dbeaver.io` portable Windows zip (Java included), GitHub release as fallback | |
 | Adminer | `adminer.org/latest.php` | |
 | Visual C++ Runtime | `aka.ms/vs/17/release/vc_redist.x64.exe` (Microsoft) | |
 

@@ -363,3 +363,11 @@ func TestFixExtensionDir(t *testing.T) {
 		t.Error("Laragon path should be fixed")
 	}
 }
+
+func TestDBeaverArgs(t *testing.T) {
+	args := DBeaverArgs(3307)
+	if len(args) != 3 || args[1] != "-con" || !strings.Contains(args[2], "port=3307") ||
+		!strings.Contains(args[2], "driver=mysql") || !strings.Contains(args[2], "id=lokalkit-mysql") {
+		t.Errorf("%q", args)
+	}
+}

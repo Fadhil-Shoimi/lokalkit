@@ -32,6 +32,9 @@ type Sources struct {
 	AdminerURL      string   `json:"adminerUrl"`
 	VCRedistURL     string   `json:"vcRedistUrl"`
 	NodeIndex       string   `json:"nodeIndex"`
+	DBeaverURL      string   `json:"dbeaverUrl"`
+	DBeaverVersion  string   `json:"dbeaverVersionXml"`
+	DBeaverGitHub   string   `json:"dbeaverGithub"` // fallback, %s = version
 	NodeBase        string   `json:"nodeBase"`
 }
 
@@ -56,6 +59,9 @@ func DefaultSources() Sources {
 		AdminerURL:     "https://www.adminer.org/latest.php",
 		VCRedistURL:    "https://aka.ms/vs/17/release/vc_redist.x64.exe",
 		NodeIndex:      "https://nodejs.org/dist/index.json",
+		DBeaverURL:     "https://dbeaver.io/files/dbeaver-ce-latest-win32.win32.x86_64.zip",
+		DBeaverVersion: "https://dbeaver.io/product/version.xml",
+		DBeaverGitHub:  "https://github.com/dbeaver/dbeaver/releases/download/%s/dbeaver-ce-%s-win32.win32.x86_64.zip",
 		NodeBase:       "https://nodejs.org/dist/",
 	}
 }
@@ -129,6 +135,9 @@ func mergeSources(base, o Sources) Sources {
 	set(&base.AdminerURL, o.AdminerURL)
 	set(&base.VCRedistURL, o.VCRedistURL)
 	set(&base.NodeIndex, o.NodeIndex)
+	set(&base.DBeaverURL, o.DBeaverURL)
+	set(&base.DBeaverVersion, o.DBeaverVersion)
+	set(&base.DBeaverGitHub, o.DBeaverGitHub)
 	set(&base.NodeBase, o.NodeBase)
 	return base
 }
@@ -290,4 +299,22 @@ func ResolveNode(ctx context.Context, s Sources) (Artifact, error) {
 		return art, nil
 	}
 	return Artifact{}, fmt.Errorf("no Node.js LTS release with a Windows zip found")
+}
+
+var dbeaverVersionRe = regexp.MustCompile(`<number>\s*([0-9]+\.[0-9]+\.[0-9]+)\s*</number>`)
+
+// ResolveDBeaver downloads the portable Windows zip of DBeaver Community
+// (it bundles its own Java). The version, when dbeaver.io reports it, names
+// the folder and enables the GitHub mirror as a fallback.
+func ResolveDBeaver(ctx context.Context, s Sources) (Artifact, error) {
+	art := Artifact{Version: "latest", Kind: "zip", Name: "dbeaver", URLs: []string{s.DBeaverURL}}
+	if b, err := get(ctx, s.DBeaverVersion); err == nil {
+		if m := dbeaverVersionRe.FindStringSubmatch(string(b)); m != nil {
+			art.Version, art.Name = m[1], "dbeaver-"+m[1]
+			if strings.Count(s.DBeaverGitHub, "%s") == 2 {
+				art.URLs = append(art.URLs, fmt.Sprintf(s.DBeaverGitHub, m[1], m[1]))
+			}
+		}
+	}
+	return art, nil
 }
