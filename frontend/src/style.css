@@ -5,9 +5,10 @@
   --border: #e3e6eb;
   --text: #1c2330;
   --muted: #6b7484;
-  --accent: #0f9d8a;
-  --accent-ink: #ffffff;
-  --accent-soft: #e2f5f2;
+  --accent: #facc15;
+  --accent-ink: #15171c;
+  --accent-text: #8a6500;
+  --brand-ink: #15171c;
   --ok: #17a34a;
   --off: #b6bcc6;
   --err: #d93a3a;
@@ -24,9 +25,10 @@
     --border: #2e343f;
     --text: #e6e9ee;
     --muted: #949cab;
-    --accent: #25b8a3;
-    --accent-ink: #06201c;
-    --accent-soft: #173b36;
+    --accent: #facc15;
+    --accent-ink: #15171c;
+    --accent-text: #facc15;
+    --brand-ink: #0d0e11;
     --ok: #34c56a;
     --off: #4b5361;
     --err: #f06363;
@@ -50,20 +52,21 @@ input, select, button { font: inherit; color: inherit; }
 
 .topbar {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 20px; background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 12px 20px; background: var(--brand-ink); color: #fff;
 }
-.brand { display: flex; align-items: center; gap: 10px; }
-.mark { width: 34px; height: 34px; }
-.name { font-weight: 700; font-size: 17px; letter-spacing: -.2px; }
-.by { font-size: 11px; color: var(--muted); margin-top: -2px; }
+.brand { display: flex; align-items: baseline; gap: 10px; }
+.wordmark { display: flex; align-items: center; font: 700 22px/1 "Sora", "Segoe UI", sans-serif; letter-spacing: -.8px; }
+.wm-toggle { width: 22px; height: 12px; margin: 4px 1px 0 2px; }
+.by { font-size: 11px; color: #b5b6bc; }
 .top-right { display: flex; align-items: center; gap: 14px; }
-.ver { color: var(--muted); font-size: 12px; }
+.ver { color: #b5b6bc; font-size: 12px; }
 .php-pick {
-  display: flex; align-items: center; gap: 6px; background: var(--surface-2);
-  border: 1px solid var(--border); border-radius: 8px; padding: 3px 4px 3px 10px;
+  display: flex; align-items: center; gap: 6px; background: #262931;
+  border: 1px solid #353943; border-radius: 8px; padding: 3px 4px 3px 10px; color: #fff;
 }
-.php-pick span { font-size: 12px; font-weight: 600; color: var(--muted); }
-.php-pick select { border: 0; background: transparent; padding: 3px 4px; outline: none; max-width: 230px; }
+.php-pick span { font-size: 12px; font-weight: 600; color: var(--accent); }
+.php-pick select { border: 0; background: transparent; padding: 3px 4px; outline: none; max-width: 230px; color: #fff; }
+.php-pick option { color: #15171c; }
 
 main { flex: 1; overflow: auto; padding: 18px 20px 24px; display: flex; flex-direction: column; gap: 16px; }
 
@@ -79,7 +82,7 @@ main { flex: 1; overflow: auto; padding: 18px 20px 24px; display: flex; flex-dir
 .svc:first-child { border-top: 0; }
 .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--off); justify-self: center; }
 .svc.running .dot { background: var(--ok); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 20%, transparent); }
-.svc.busy .dot { background: var(--accent); animation: pulse 1s infinite; }
+.svc.busy .dot { background: var(--accent-text); animation: pulse 1s infinite; }
 @keyframes pulse { 50% { opacity: .3; } }
 .svc-name { font-weight: 600; }
 .svc-name small { font-weight: 400; color: var(--muted); margin-left: 6px; }
@@ -97,7 +100,7 @@ main { flex: 1; overflow: auto; padding: 18px 20px 24px; display: flex; flex-dir
 .btn:hover { background: var(--surface-2); }
 .btn:disabled { opacity: .55; cursor: default; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
-.btn.primary:hover { filter: brightness(1.06); }
+.btn.primary:hover { filter: brightness(.96); }
 .btn.danger { color: var(--err); }
 .btn.ghost { background: transparent; }
 .btn.small { padding: 4px 10px; font-size: 12.5px; }
@@ -115,7 +118,7 @@ main { flex: 1; overflow: auto; padding: 18px 20px 24px; display: flex; flex-dir
   border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 7px 10px; outline: none;
 }
 .new-project input { flex: 1; font-family: var(--mono); user-select: text; }
-.new-project input:focus, .settings input:focus { border-color: var(--accent); }
+.new-project input:focus, .settings input:focus { border-color: var(--accent-text); }
 
 .projects { display: flex; flex-direction: column; gap: 8px; }
 .proj {
@@ -124,7 +127,7 @@ main { flex: 1; overflow: auto; padding: 18px 20px 24px; display: flex; flex-dir
 }
 .proj-main { flex: 1; min-width: 0; }
 .proj-name { font-weight: 600; }
-.proj-url { color: var(--accent); font-family: var(--mono); font-size: 12.5px; cursor: pointer; text-decoration: none; }
+.proj-url { color: var(--accent-text); font-family: var(--mono); font-size: 12.5px; cursor: pointer; text-decoration: none; }
 .proj-url:hover { text-decoration: underline; }
 .badge { font-size: 11px; padding: 1px 8px; border-radius: 10px; background: var(--surface-2); color: var(--muted); margin-left: 6px; font-weight: 500; }
 .badge.laravel { background: #fdecec; color: #d43b2a; }

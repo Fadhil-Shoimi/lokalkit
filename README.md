@@ -1,4 +1,7 @@
-# LokalKit — by Codeslab
+<p align="center"><img src="assets/logo-mark.svg" width="120" alt="LokalKit"></p>
+
+<h1 align="center">LokalKit</h1>
+<p align="center">by Codeslab</p>
 
 Persekitaran pembangunan PHP lokal untuk Windows. Satu klik untuk **Apache + PHP + MySQL + Mailpit**, dengan virtual host automatik (`nama-projek.test`).
 
@@ -104,6 +107,7 @@ go test ./internal/...
 Untuk `wails dev`, set `LOKALKIT_ROOT=C:\LokalKit` supaya ia guna folder sebenar.
 
 Struktur kod:
+- `assets/`: logo (SVG). Ikon app dijana dari `build/appicon.png`
 - `internal/core/`: enjin (urus proses, jana config Apache/MySQL/php.ini, vhost, fail hosts)
 - `app.go`: fungsi yang dipanggil oleh UI
 - `frontend/`: UI (HTML/CSS/JS + Vite)

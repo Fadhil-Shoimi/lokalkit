@@ -1,3 +1,4 @@
+import '@fontsource/sora/700.css';
 import './style.css';
 
 // Go methods bound by Wails live on window.go.main.App; events on window.runtime.
