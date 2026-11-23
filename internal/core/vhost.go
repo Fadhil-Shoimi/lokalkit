@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -351,17 +350,6 @@ func readSmall(path string) string {
 		return ""
 	}
 	return string(b)
-}
-
-// flushDNS clears Windows' DNS cache so a name that failed to resolve a
-// moment ago ("NXDOMAIN") is looked up again in the new hosts file.
-func flushDNS() {
-	if runtime.GOOS != "windows" {
-		return
-	}
-	cmd := exec.Command("ipconfig", "/flushdns")
-	hideWindow(cmd)
-	_ = cmd.Run()
 }
 
 // RunElevatedHostsSync is what "lokalkit.exe --sync-hosts <root>" runs as

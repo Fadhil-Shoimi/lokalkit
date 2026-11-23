@@ -4,7 +4,6 @@ package core
 
 import (
 	"os/exec"
-	"strconv"
 	"syscall"
 )
 
@@ -21,11 +20,4 @@ func hideWindow(cmd *exec.Cmd) {
 // newConsole gives the process its own visible console window (for terminals).
 func newConsole(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: createNewConsole}
-}
-
-// killTree kills a process and all its children (Apache spawns a child worker).
-func killTree(pid int) {
-	cmd := exec.Command("taskkill", "/T", "/F", "/PID", strconv.Itoa(pid))
-	hideWindow(cmd)
-	_ = cmd.Run()
 }

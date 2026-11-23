@@ -1,7 +1,6 @@
 package core
 
 import (
-	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -15,7 +14,6 @@ import (
 	"math/big"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -211,15 +209,12 @@ func (m *Manager) TrustCA() error {
 	if runtime.GOOS != "windows" {
 		return errors.New("automatic certificate trust is only available on Windows")
 	}
-	if _, _, _, err := EnsureCA(m.sslDir()); err != nil {
+	ca, _, _, err := EnsureCA(m.sslDir())
+	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "certutil", "-user", "-addstore", "Root", filepath.Join(m.sslDir(), caFile))
-	hideWindow(cmd)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("certificate not trusted (cancelled?): %s", lastLines(string(out), 2))
+	if err := addUserRootCert(ca.Raw); err != nil {
+		return fmt.Errorf("certificate not trusted: %v", err)
 	}
 	if !m.CATrusted() {
 		return errors.New("certificate is not trusted yet. Try again from Settings → Trust certificate")
@@ -238,12 +233,7 @@ func (m *Manager) CATrusted() bool {
 	if err != nil {
 		return false
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	thumb := sha1.Sum(ca.Raw)
-	cmd := exec.CommandContext(ctx, "certutil", "-user", "-verifystore", "Root", fmt.Sprintf("%x", thumb))
-	hideWindow(cmd)
-	return cmd.Run() == nil
+	return userRootHasCert(ca.Raw)
 }
 
 func (m *Manager) SSLStatus() SSLStatus {
