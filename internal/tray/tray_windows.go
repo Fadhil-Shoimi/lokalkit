@@ -3,7 +3,6 @@
 package tray
 
 import (
-	_ "embed"
 	"runtime"
 	"sync"
 
@@ -12,11 +11,10 @@ import (
 	"fyne.io/systray"
 )
 
-//go:embed icons/tray-on.ico
-var iconOn []byte
-
-//go:embed icons/tray-off.ico
-var iconOff []byte
+var (
+	iconOn  = IconOn
+	iconOff = IconOff
+)
 
 type Tray struct {
 	a     Actions

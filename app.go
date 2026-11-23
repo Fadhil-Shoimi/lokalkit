@@ -52,6 +52,7 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.m = m
 	m.ConfirmTrust = a.confirmTrust
+	core.TerminalIcon = tray.IconOn
 	a.tray = tray.Start(a.trayActions(), m.Services())
 	a.inst = installer.New(m.P.Root, a.detectComponent, func(p installer.Progress) {
 		runtime.EventsEmit(ctx, "install-progress", p)

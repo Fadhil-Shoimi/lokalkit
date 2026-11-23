@@ -106,10 +106,20 @@ func BuildPHPIni(src, phpDir string, smtpPort int, hasExt func(string) bool) str
 		if !hasExt(ext) {
 			continue
 		}
-		re := regexp.MustCompile(`(?m)^;[ \t]*extension[ \t]*=[ \t]*(php_)?` + regexp.QuoteMeta(ext) + `(\.dll)?[ \t]*\r?$`)
-		if re.MatchString(s) {
-			s = re.ReplaceAllString(s, "extension="+ext)
-		} else if !strings.Contains(s, "\nextension="+ext) {
+		if enabledExt(s, ext) {
+			continue
+		}
+		// Only the real list entry ";extension=X" (no space after ';'). The
+		// file's header comments contain examples like ";   extension=mysqli"
+		// which must stay commented, or the module loads twice.
+		re := regexp.MustCompile(`(?m)^;extension[ \t]*=[ \t]*(php_)?` + regexp.QuoteMeta(ext) + `(\.dll)?[ \t]*\r?$`)
+		if loc := re.FindStringIndex(s); loc != nil {
+			end := loc[1]
+			if end > loc[0] && s[end-1] == '\r' {
+				end--
+			}
+			s = s[:loc[0]] + "extension=" + ext + s[end:]
+		} else {
 			s += "\nextension=" + ext + "\n"
 		}
 	}
@@ -140,11 +150,50 @@ func (m *Manager) fixExtensionDir(php PHPInstall, ini string) error {
 	}
 	want := slash(filepath.Join(php.Dir, "ext"))
 	fixed, changed := FixExtensionDir(string(b), want)
+	if changed {
+		m.Logf("info", "Fixed extension_dir in %s (it pointed to another folder)", ini)
+	}
+	if deduped, n := DedupeExtensions(fixed); n > 0 {
+		fixed, changed = deduped, true
+		m.Logf("info", "Removed %d duplicate extension line(s) from %s", n, ini)
+	}
 	if !changed {
 		return nil
 	}
-	m.Logf("info", "Fixed extension_dir in %s (it pointed to another folder)", ini)
 	return os.WriteFile(ini, []byte(fixed), 0o644)
+}
+
+var extLineRe = regexp.MustCompile(`(?m)^[ \t]*extension[ \t]*=[ \t]*"?(?:php_)?([A-Za-z0-9_]+)(?:\.dll)?"?[ \t]*\r?$`)
+
+// enabledExt reports whether ext is already enabled (uncommented).
+func enabledExt(ini, ext string) bool {
+	for _, m := range extLineRe.FindAllStringSubmatch(ini, -1) {
+		if strings.EqualFold(m[1], ext) {
+			return true
+		}
+	}
+	return false
+}
+
+// DedupeExtensions comments out repeated "extension=X" lines, which make
+// PHP warn "Module X is already loaded". Returns the count removed.
+func DedupeExtensions(ini string) (string, int) {
+	seen := map[string]bool{}
+	removed := 0
+	out := extLineRe.ReplaceAllStringFunc(ini, func(line string) string {
+		name := strings.ToLower(extLineRe.FindStringSubmatch(line)[1])
+		if seen[name] {
+			removed++
+			cr := ""
+			if strings.HasSuffix(line, "\r") {
+				cr = "\r"
+			}
+			return ";" + strings.TrimRight(strings.TrimLeft(line, " \t"), "\r") + " ; duplicate, disabled by LokalKit" + cr
+		}
+		seen[name] = true
+		return line
+	})
+	return out, removed
 }
 
 // FixExtensionDir points an absolute extension_dir at want. Relative values

@@ -2,6 +2,7 @@ package core
 
 import (
 	"crypto/x509"
+	"encoding/json"
 	"net"
 	"os"
 	"os/exec"
@@ -402,5 +403,49 @@ func TestAdoptPHPIni(t *testing.T) {
 	b, _ := os.ReadFile(filepath.Join(m.P.Bin, "php", "php-8.3.38", "php.ini"))
 	if !strings.Contains(string(b), "memory_limit = 2G") || !strings.Contains(string(b), "php-8.3.38/ext") {
 		t.Errorf("new php.ini: %s", b)
+	}
+}
+
+func TestPHPIniNoDuplicateMysqli(t *testing.T) {
+	// Mirrors php.ini-development: an example in the header comments, then the real list.
+	src := "; Notes for Windows environments :\n;\n; For example:\n;\n;   extension=mysqli\n;\n[PHP]\n;extension=curl\n;extension=mysqli\n;extension=openssl\n"
+	out := BuildPHPIni(src, "C:/php", 1025, func(string) bool { return true })
+	if n := strings.Count(out, "\nextension=mysqli"); n != 1 {
+		t.Fatalf("mysqli enabled %d times:\n%s", n, out)
+	}
+	if !strings.Contains(out, ";   extension=mysqli") {
+		t.Error("the header example must stay commented")
+	}
+	broken := "extension=curl\r\nextension=mysqli\r\n;   x\r\nextension=mysqli\r\nextension=php_curl.dll\r\n"
+	fixed, n := DedupeExtensions(broken)
+	if n != 2 || strings.Count(fixed, "\nextension=mysqli") != 1 || !strings.Contains(fixed, ";extension=mysqli ; duplicate") {
+		t.Fatalf("dedupe %d:\n%q", n, fixed)
+	}
+}
+
+func TestTerminalFiles(t *testing.T) {
+	init := BuildTerminalInit([]string{`C:\LokalKit\bin\php\php-8.3.37`}, "8.3.37", "26.13.1", 3306)
+	for _, want := range []string{"chcp 65001", `set "PATH=C:\LokalKit\bin\php\php-8.3.37;%PATH%"`, "doskey art=php artisan $*", "PHP 8.3.37", "Node 26.13.1", "prompt $E[38;2;250;204;21m", "\r\n"} {
+		if !strings.Contains(init, want) {
+			t.Errorf("init missing %q", want)
+		}
+	}
+	frag, err := BuildTerminalFragment(`C:\LokalKit\etc\terminal\lokalkit-init.cmd`, `C:\LokalKit\etc\terminal\lokalkit.ico`, `C:\LokalKit\www`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var f struct {
+		Profiles []map[string]any `json:"profiles"`
+		Schemes  []map[string]any `json:"schemes"`
+	}
+	if err := json.Unmarshal(frag, &f); err != nil || len(f.Profiles) != 1 || len(f.Schemes) != 1 {
+		t.Fatalf("fragment: %s %v", frag, err)
+	}
+	p := f.Profiles[0]
+	if p["name"] != "LokalKit" || p["colorScheme"] != "LokalKit" || p["guid"] == "" || !strings.Contains(p["commandline"].(string), "lokalkit-init.cmd") {
+		t.Errorf("profile: %v", p)
+	}
+	if f.Schemes[0]["background"] != "#15171C" || f.Schemes[0]["cursorColor"] != "#FACC15" {
+		t.Errorf("scheme: %v", f.Schemes[0])
 	}
 }

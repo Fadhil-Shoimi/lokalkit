@@ -59,9 +59,20 @@ func (m *Manager) OpenTerminal(dir, command string) error {
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
 		if command == "" {
-			command = "php -v"
+			initPath, err := m.prepareTerminal()
+			if err != nil {
+				return err
+			}
+			command = initPath
 		}
-		cmd = terminalCommand(dir, command)
+		if wt := windowsTerminal(); wt != "" {
+			// Windows Terminal with the LokalKit profile (colours, icon). The
+			// command line is given too, so it works even before Windows
+			// Terminal has picked up the new profile.
+			cmd = exec.Command(wt, "-p", terminalProfileName, "-d", dir, "cmd.exe", "/K", command)
+		} else {
+			cmd = terminalCommand(dir, command)
+		}
 	} else {
 		term := os.Getenv("TERMINAL")
 		if term == "" {
