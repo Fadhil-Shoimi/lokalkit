@@ -19,6 +19,7 @@ A local PHP development environment for Windows. **Apache + PHP + MySQL + Mailpi
 - Quick buttons: Web, Database (HeidiSQL/Adminer), Terminal (PHP, Composer and MySQL on PATH), www folder
 - Create new projects: blank PHP or **Laravel** (a database is created too)
 - **System tray**: a switch icon in the taskbar (yellow = services running, grey = stopped). Click to open, right-click to start/stop services and for shortcuts. The X button hides the app to the tray (configurable in Settings)
+- **One-click installer**: download Apache, PHP, MySQL, Mailpit, Composer, Adminer and the Visual C++ Runtime from their official sites, with SHA-256 checks where the source publishes them
 - Configurable ports. Everything lives in one folder, so the install is portable
 
 ## Folder layout
@@ -48,7 +49,9 @@ You can keep several PHP versions in `bin\php\` and pick one from the menu at th
 
 1. Create a `C:\LokalKit` folder and put `LokalKit.exe` in it.
 2. Run `LokalKit.exe` once. It creates `bin`, `www` and the other folders.
-3. Fill `bin\` with the official binaries (all free and open source):
+3. Open the **Install** tab (it opens by itself on first run), keep the recommended items ticked and click **Install selected**. LokalKit downloads everything from the official websites into `bin\`.
+
+   Prefer to do it by hand? Put the official binaries in `bin\` yourself:
 
 | Component | Download | Put in |
 |---|---|---|
@@ -90,6 +93,20 @@ After that, `https://project.test` works without warnings in Chrome and Edge.
 - Don't like it? Turn off "Close button (X) hides LokalKit to the system tray" in **Settings**
 
 > Windows sometimes hides new icons in the `^` overflow menu. Drag the switch icon onto the taskbar to keep it visible.
+
+## Installer sources
+
+| Item | Where it comes from | Verified |
+|---|---|---|
+| PHP | newest Thread Safe x64 build of the configured branch, from `windows.php.net/downloads/releases/releases.json` | SHA-256 |
+| Apache | newest Apache 2.4 Win64 zip linked on `apachelounge.com/download/` | SHA-256 when published |
+| MySQL | pinned version from the official MySQL archive | |
+| Mailpit | latest GitHub release | |
+| Composer | `getcomposer.org` latest stable | SHA-256 |
+| Adminer | `adminer.org/latest.php` | |
+| Visual C++ Runtime | `aka.ms/vs/17/release/vc_redist.x64.exe` (Microsoft) | |
+
+If a download moves, the URLs can be fixed without a new `LokalKit.exe`: edit [`manifest.json`](manifest.json) in this repository (any field of `internal/installer/sources.go` → `Sources`). The app reads it on each install. This only works while the repository is public.
 
 ## Database (Laravel `.env`)
 
@@ -142,6 +159,7 @@ LOKALKIT_IT=1 go test -run Integration ./internal/core
 Code layout:
 - `internal/core/`: the engine (process management, Apache/MySQL/php.ini config, vhosts, hosts file, SSL)
 - `internal/tray/`: system tray icon and menu
+- `internal/installer/`: downloads and installs the binaries
 - `app.go`: functions the UI calls
 - `frontend/`: the UI (HTML/CSS/JS + Vite)
 - `assets/`: logo (SVG). The app icon is generated from `build/appicon.png`
@@ -150,7 +168,7 @@ Code layout:
 
 - [x] System tray icon
 - [x] Local SSL (`https://project.test`)
-- [ ] Download binaries from inside the app
+- [x] Download binaries from inside the app
 - [ ] Redis, PostgreSQL, Node.js
 - [ ] Installer (NSIS)
 - [ ] Share projects (tunnel)

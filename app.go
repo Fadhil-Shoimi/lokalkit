@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"lokalkit/internal/core"
+	"lokalkit/internal/installer"
 	"lokalkit/internal/tray"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -20,6 +21,7 @@ type App struct {
 	m        *core.Manager
 	initErr  string
 	tray     *tray.Tray
+	inst     *installer.Installer
 	quitting bool // true when quitting for real (tray "Quit"), not hiding
 	hidTold  bool // already told the user the app keeps running in the tray
 }
@@ -42,6 +44,9 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.m = m
 	a.tray = tray.Start(a.trayActions(), m.Services())
+	a.inst = installer.New(m.P.Root, a.detectComponent, func(p installer.Progress) {
+		runtime.EventsEmit(ctx, "install-progress", p)
+	})
 	m.Logf("info", "LokalKit %s ready. Folder: %s", AppVersion, m.P.Root)
 	if m.Config().StartAllOnLaunch {
 		go m.StartAll()
@@ -128,6 +133,53 @@ func (a *App) beforeClose(ctx context.Context) bool {
 		return false
 	}
 	return res != "Yes" && res != "Ok"
+}
+
+// detectComponent tells the installer what the engine already found in bin.
+func (a *App) detectComponent(id string) (bool, string) {
+	if id == "php" {
+		if p, ok := a.m.CurrentPHP(); ok {
+			return true, p.Version
+		}
+		return false, ""
+	}
+	for _, s := range a.m.Services() {
+		if s.ID == id {
+			return s.Installed, s.Version
+		}
+	}
+	return false, ""
+}
+
+// GetComponents lists what can be downloaded and what is already installed.
+func (a *App) GetComponents() []installer.Component {
+	if a.inst == nil {
+		return nil
+	}
+	return a.inst.Components()
+}
+
+// InstallComponents downloads and installs the chosen components. Progress
+// arrives as "install-progress" events; this returns when all are done.
+func (a *App) InstallComponents(ids []string) error {
+	if err := a.ready(); err != nil {
+		return err
+	}
+	a.m.Logf("info", "Installing: %v", ids)
+	err := a.inst.Install(ids)
+	if err != nil {
+		a.m.Logf("error", "Install: %v", err)
+	} else {
+		a.m.Logf("ok", "Installation finished")
+	}
+	runtime.EventsEmit(a.ctx, "services", a.m.Services())
+	return err
+}
+
+func (a *App) CancelInstall() {
+	if a.inst != nil {
+		a.inst.Cancel()
+	}
 }
 
 type State struct {

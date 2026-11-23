@@ -40,8 +40,21 @@
     <nav class="tabs">
       <button class="tab active" data-tab="projects">Projects <span class="count" id="projCount"></span></button>
       <button class="tab" data-tab="logs">Logs</button>
+      <button class="tab" data-tab="install">Install <span class="count warn" id="installCount" hidden></span></button>
       <button class="tab" data-tab="settings">Settings</button>
     </nav>
+
+    <section class="panel" id="tab-install" hidden>
+      <p class="intro">Download what LokalKit needs from the official websites. Already have these (for example from Laragon)? You can copy them into the <button type="button" class="linkish" data-folder="bin">bin folder</button> instead.</p>
+      <div id="components" class="components"></div>
+      <div class="install-foot">
+        <span class="muted-text" id="installHint"></span>
+        <div class="ssl-btns">
+          <button type="button" class="btn ghost" id="btnCancelInstall" hidden>Cancel</button>
+          <button type="button" class="btn primary" id="btnInstall">Install selected</button>
+        </div>
+      </div>
+    </section>
 
     <section class="panel" id="tab-projects">
       <form class="new-project" id="newProject">

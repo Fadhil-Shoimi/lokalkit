@@ -47,7 +47,7 @@ function renderServices(services) {
       : `<div><div class="svc-name">${esc(s.name)}</div><div class="svc-missing">Not found. Put it in <code>${esc(s.hint)}</code></div></div>`;
     const button = s.installed
       ? `<button class="btn ${s.running ? 'danger' : ''}" data-svc="${s.id}" ${s.busy ? 'disabled' : ''}>${label}</button>`
-      : `<button class="btn small ghost" data-folder="bin">Open bin</button>`;
+      : `<button class="btn small" data-tab-go="install">Install</button>`;
     return `<div class="${cls}"><span class="dot"></span>${detail}<span class="svc-port">${esc(s.ports)}</span>${button}</div>`;
   }).join('');
 
@@ -135,6 +135,60 @@ function renderSSL(ssl) {
   btn.hidden = !ssl.supported || !ssl.caExists || ssl.trusted;
 }
 
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.panel').forEach((p) => (p.hidden = p.id !== 'tab-' + name));
+  if (name === 'logs') $('#logs').scrollTop = $('#logs').scrollHeight;
+  if (name === 'install') loadComponents();
+}
+
+// ---------- installer ----------
+
+let components = [];
+let installing = false;
+const progress = {}; // id -> last Progress
+
+function fmtMB(n) { return (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + ' MB'; }
+
+async function loadComponents() {
+  components = (await api.GetComponents()) || [];
+  renderComponents();
+}
+
+function renderComponents() {
+  const missing = components.filter((c) => c.recommended && !c.installed).length;
+  $('#installCount').textContent = missing || '';
+  $('#installCount').hidden = !missing;
+  const checked = new Set([...document.querySelectorAll('#components input:checked')].map((i) => i.value));
+  const firstRender = !document.querySelector('#components input');
+  $('#components').innerHTML = components.map((c) => {
+    const p = progress[c.id];
+    const isChecked = firstRender ? (c.recommended && !c.installed) : checked.has(c.id);
+    let state = c.installed ? `<span class="comp-state ok">✓ Installed${c.version ? ' ' + esc(c.version) : ''}</span>` : '<span class="comp-state">Not installed</span>';
+    if (p && p.phase === 'done') state = `<span class="comp-state ok">✓ Installed${p.version && p.version !== 'latest' ? ' ' + esc(p.version) : ''}</span>`;
+    if (p && p.phase === 'error') state = '<span class="comp-state err">Failed</span>';
+    let prog = '';
+    if (p && !['done'].includes(p.phase)) {
+      const known = p.phase === 'downloading' && p.total > 0;
+      const pct = known ? Math.round((p.received / p.total) * 100) : 0;
+      const bar = ['error', 'cancelled'].includes(p.phase) ? ''
+        : `<div class="bar ${known ? '' : 'indeterminate'}"><div style="${known ? `width:${pct}%` : ''}"></div></div>`;
+      let msg = esc(p.message);
+      if (p.phase === 'downloading') msg = `Downloading ${p.version && p.version !== 'latest' ? esc(p.version) + ' ' : ''}· ${fmtMB(p.received)}${p.total > 0 ? ' / ' + fmtMB(p.total) + ` (${pct}%)` : ''}`;
+      prog = `<div class="comp-progress">${bar}<span class="comp-msg ${p.phase === 'error' ? 'err' : ''}">${msg}</span></div>`;
+    }
+    return `<label class="comp">
+      <input type="checkbox" value="${c.id}" ${isChecked ? 'checked' : ''} ${installing ? 'disabled' : ''}/>
+      <div><div class="comp-name">${esc(c.name)}</div><div class="comp-desc">${esc(c.description)}</div></div>
+      ${state}${prog}
+    </label>`;
+  }).join('');
+  $('#btnInstall').disabled = installing;
+  $('#btnInstall').textContent = installing ? 'Installing…' : 'Install selected';
+  $('#btnCancelInstall').hidden = !installing;
+  $('#installHint').textContent = installing ? 'You can keep using LokalKit while this runs.' : '';
+}
+
 async function refresh() {
   state = await api.GetState();
   $('#appVersion').textContent = 'v' + state.version;
@@ -147,6 +201,10 @@ async function refresh() {
   renderProjects(state.projects);
   renderPHP();
   renderSettings();
+  loadComponents().then(() => {
+    // First run with nothing installed: open the Install tab.
+    if (!state.services.some((x) => x.installed)) showTab('install');
+  });
   $('#logs').innerHTML = '';
   logs = [];
   state.logs.forEach(addLog);
@@ -169,10 +227,8 @@ document.addEventListener('click', (ev) => {
     run(() => api.OpenTerminal(t.dataset.term));
   } else if (t.dataset.url) {
     api.OpenURL(t.dataset.url);
-  } else if (t.dataset.tab) {
-    document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b === t));
-    document.querySelectorAll('.panel').forEach((p) => (p.hidden = p.id !== 'tab-' + t.dataset.tab));
-    if (t.dataset.tab === 'logs') $('#logs').scrollTop = $('#logs').scrollHeight;
+  } else if (t.dataset.tab || t.dataset.tabGo) {
+    showTab(t.dataset.tab || t.dataset.tabGo);
   } else if (t.id === 'clearLog') {
     $('#logs').innerHTML = '';
   } else if (t.dataset.act) {
@@ -243,6 +299,29 @@ $('#btnTrust').addEventListener('click', async (ev) => {
   const st = await run(() => api.TrustCA(), ev.currentTarget);
   if (st) { state.ssl = st; renderSSL(st); if (st.trusted) toast('Certificate trusted. Restart your browser if needed.'); }
 });
+
+$('#btnInstall').addEventListener('click', async () => {
+  const ids = [...document.querySelectorAll('#components input:checked')].map((i) => i.value);
+  if (!ids.length) return toast('Tick at least one item to install', true);
+  ids.forEach((id) => delete progress[id]);
+  installing = true;
+  renderComponents();
+  try {
+    await api.InstallComponents(ids);
+    toast('Installation finished. Click Start All to begin.');
+  } catch (e) {
+    toast(String(e), true);
+  } finally {
+    installing = false;
+    await loadComponents();
+    const s = await api.GetState();
+    state.php = s.php; state.currentPhp = s.currentPhp; renderPHP();
+  }
+});
+
+$('#btnCancelInstall').addEventListener('click', () => api.CancelInstall());
+
+on('install-progress', (p) => { progress[p.id] = p; renderComponents(); });
 
 on('services', (s) => { renderServices(s); renderProjects(state.projects || []); });
 on('log', addLog);
