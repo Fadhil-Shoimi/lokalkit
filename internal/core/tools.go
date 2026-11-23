@@ -98,6 +98,14 @@ func OpenPath(p string) error {
 // OpenDatabase launches HeidiSQL if available; otherwise returns the
 // Adminer URL for the caller to open in the browser.
 func (m *Manager) OpenDatabase() (url string, err error) {
+	// A database tool can't connect to a stopped MySQL ("Connection refused"),
+	// so start it first.
+	if s, _ := m.service("mysql"); s.Info().Installed && !s.Running() {
+		m.Logf("info", "MySQL is not running; starting it before opening the database tool...")
+		if err := m.Start("mysql"); err != nil {
+			return "", fmt.Errorf("MySQL could not start, so the database tool can't connect: %w", err)
+		}
+	}
 	if dbeaver := findUnder(filepath.Join(m.P.Bin, "dbeaver"), exeName("dbeaver")); dbeaver != "" {
 		cmd := exec.Command(dbeaver, DBeaverArgs(m.config().MySQLPort)...)
 		cmd.Dir = filepath.Dir(dbeaver)
