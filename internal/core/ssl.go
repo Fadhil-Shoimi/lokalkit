@@ -195,6 +195,10 @@ func (m *Manager) trustIfNeeded() {
 	if runtime.GOOS != "windows" || m.CATrusted() {
 		return
 	}
+	if m.ConfirmTrust != nil && !m.ConfirmTrust() {
+		m.Logf("info", "Certificate not trusted yet: browsers will warn on https://. Trust it any time in Settings → HTTPS → Trust certificate.")
+		return
+	}
 	m.Logf("info", "Windows will ask you to trust the LokalKit certificate. Click \"Yes\" so https:// shows no warnings.")
 	if err := m.TrustCA(); err != nil {
 		m.Logf("error", "%v", err)

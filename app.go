@@ -44,6 +44,7 @@ func (a *App) startup(ctx context.Context) {
 		return
 	}
 	a.m = m
+	m.ConfirmTrust = a.confirmTrust
 	a.tray = tray.Start(a.trayActions(), m.Services())
 	a.inst = installer.New(m.P.Root, a.detectComponent, func(p installer.Progress) {
 		runtime.EventsEmit(ctx, "install-progress", p)
@@ -283,6 +284,22 @@ func (a *App) RepairProject(name string) error {
 		return err
 	}
 	return a.m.RepairProject(name)
+}
+
+// confirmTrust explains the Windows "Security Warning" before it appears,
+// so it doesn't come as a scary surprise.
+func (a *App) confirmTrust() bool {
+	res, err := runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
+		Type:  runtime.QuestionDialog,
+		Title: "Set up HTTPS for your projects",
+		Message: "LokalKit made its own local certificate so https://project.localhost works without browser warnings.\n\n" +
+			"Next, Windows will show a \"Security Warning\" asking to install a certificate from \"LokalKit CA\". " +
+			"This is expected: click Yes. It is only trusted on this computer and you only do this once.",
+		Buttons:       []string{"Continue", "Not now"},
+		DefaultButton: "Continue",
+		CancelButton:  "Not now",
+	})
+	return err != nil || res == "Continue" || res == "Yes" || res == "Ok"
 }
 
 // FixHosts adds every project to the Windows hosts file (asks for admin).

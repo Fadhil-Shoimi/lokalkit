@@ -52,6 +52,10 @@ type Manager struct {
 
 	trustAsked bool // asked Windows to trust the CA during this session
 
+	// ConfirmTrust, when set, explains the upcoming Windows certificate
+	// prompt and returns false if the user chose "Not now".
+	ConfirmTrust func() bool
+
 	tasks projectTasks // background Composer/Laravel jobs per project
 
 	watchMu sync.Mutex
