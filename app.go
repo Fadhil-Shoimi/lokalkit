@@ -370,6 +370,57 @@ func (a *App) OpenFolder(key string) error {
 	if dir, ok := paths[key]; ok {
 		return core.OpenPath(dir)
 	}
-	// Otherwise treat as a project folder name inside www.
+	// Otherwise it is a project name (its folder may be outside www).
+	for _, pr := range a.m.Projects() {
+		if pr.Name == key {
+			return core.OpenPath(pr.Path)
+		}
+	}
 	return core.OpenPath(filepath.Join(p.WWW, filepath.Base(key)))
+}
+
+// ---------- importing existing projects ----------
+
+// DetectLaragon returns the Laragon folder (e.g. C:\laragon) if found.
+func (a *App) DetectLaragon() string { return core.DetectLaragon() }
+
+// PickFolder shows a folder chooser.
+func (a *App) PickFolder(title string) (string, error) {
+	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{Title: title})
+}
+
+func (a *App) ScanImport(dir string) ([]core.ImportCandidate, error) {
+	if err := a.ready(); err != nil {
+		return nil, err
+	}
+	return a.m.ScanImport(dir)
+}
+
+func (a *App) ImportProjects(paths []string) ([]string, error) {
+	if err := a.ready(); err != nil {
+		return nil, err
+	}
+	return a.m.ImportProjects(paths)
+}
+
+func (a *App) UnlinkProject(name string) error {
+	if err := a.ready(); err != nil {
+		return err
+	}
+	return a.m.UnlinkProject(name)
+}
+
+// LegacyDatabases lists databases in another tool's MySQL data folder.
+func (a *App) LegacyDatabases(root string) (core.LegacyDatabases, error) {
+	if err := a.ready(); err != nil {
+		return core.LegacyDatabases{}, err
+	}
+	return a.m.LegacyDatabasesIn(root)
+}
+
+func (a *App) ImportDatabases(root string, dbs []string) error {
+	if err := a.ready(); err != nil {
+		return err
+	}
+	return a.m.ImportDatabases(root, dbs)
 }

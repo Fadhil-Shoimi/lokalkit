@@ -70,7 +70,7 @@ function renderProjects(projects) {
   $('#projects').innerHTML = projects.map((p) => `
     <div class="proj">
       <div class="proj-main">
-        <div class="proj-name">${esc(p.name)}${p.kind !== 'php' ? `<span class="badge ${p.kind}">${p.kind}</span>` : ''}</div>
+        <div class="proj-name">${esc(p.name)}${p.kind !== 'php' ? `<span class="badge ${p.kind}">${p.kind}</span>` : ''}${p.linked ? `<span class="badge linked" title="${esc(p.path)}">imported</span>` : ''}</div>
         <div class="proj-links">
           ${p.https
             ? `<a class="proj-url" data-url="${esc(p.https)}" title="${apacheUp ? 'Open in browser' : 'Start Apache first'}">${esc(p.https)}</a>
@@ -86,6 +86,7 @@ function renderProjects(projects) {
       <div class="proj-btns">
         <button class="btn small" data-folder="${esc(p.name)}">Folder</button>
         <button class="btn small" data-term="${esc(p.path)}">Terminal</button>
+        ${p.linked ? `<button class="btn small ghost" data-unlink="${esc(p.name)}" title="Remove from LokalKit. The files stay where they are.">Remove</button>` : ''}
       </div>
     </div>`).join('');
 }
@@ -232,6 +233,9 @@ document.addEventListener('click', (ev) => {
       renderProjects(state.projects);
       if (!state.missingHosts.length) toast('Hosts file updated. Reload the page in your browser.');
     }, t);
+  } else if (t.dataset.unlink) {
+    if (!confirm(`Remove ${t.dataset.unlink} from LokalKit?\n\nIts files are NOT deleted; they stay in their folder.`)) return;
+    run(async () => { await api.UnlinkProject(t.dataset.unlink); await refreshProjects(); toast('Removed from LokalKit'); }, t);
   } else if (t.dataset.repair) {
     run(async () => { await api.RepairProject(t.dataset.repair); await refreshProjects(); toast('Installing packages… progress shows on the project'); }, t);
   } else if (t.dataset.uselocalhost) {
@@ -340,6 +344,71 @@ $('#btnInstall').addEventListener('click', async () => {
 });
 
 $('#btnCancelInstall').addEventListener('click', () => api.CancelInstall());
+
+// ---------- import existing projects ----------
+
+let impRoot = ''; // tool root (e.g. C:\laragon) when the folder is its www
+
+async function showImport() {
+  $('#importPanel').hidden = false;
+  if (!$('#impDir').value) {
+    const lar = await api.DetectLaragon();
+    if (lar) await scanImport(lar + (lar.includes('\\') ? '\\' : '/') + 'www');
+    else $('#impList').innerHTML = '<div class="muted-text">Laragon was not found automatically. Click Browse… and choose the folder that holds your projects.</div>';
+  }
+}
+
+async function scanImport(dir) {
+  $('#impDir').value = dir;
+  const cands = await run(() => api.ScanImport(dir));
+  if (!cands) return;
+  $('#impList').innerHTML = cands.length ? cands.map((c) => {
+    const note = c.added ? '<span class="imp-note ok">✓ already added</span>'
+      : c.conflict ? `<span class="imp-note err">${esc(c.conflict)}</span>`
+      : `<span class="imp-note">${esc(c.host)}</span>`;
+    return `<label class="imp-row"><input type="checkbox" value="${esc(c.path)}" ${!c.added && !c.conflict ? 'checked' : 'disabled'}/>
+      <div><div>${esc(c.name)} ${c.kind !== 'php' ? `<span class="badge ${c.kind}">${c.kind}</span>` : ''}</div><div class="muted-text">${esc(c.path)}</div></div>${note}</label>`;
+  }).join('') : '<div class="muted-text">No project folders found here.</div>';
+  // Databases: when the folder is a tool's "www", look for its MySQL data.
+  impRoot = /[\\/]www[\\/]?$/i.test(dir) ? dir.replace(/[\\/]www[\\/]?$/i, '') : '';
+  $('#impDbs').hidden = true;
+  if (impRoot) {
+    try {
+      const info = await api.LegacyDatabases(impRoot);
+      if (info.databases && info.databases.length) {
+        $('#impDbHint').textContent = `Found in ${info.dataDir}`;
+        $('#dbList').innerHTML = info.databases.map((d) => `<label class="imp-row"><input type="checkbox" value="${esc(d)}" checked/><div>${esc(d)}</div><span></span></label>`).join('');
+        $('#impDbs').hidden = false;
+      }
+    } catch (e) { /* no MySQL data there */ }
+  }
+}
+
+$('#btnShowImport').addEventListener('click', showImport);
+$('#btnHideImport').addEventListener('click', () => ($('#importPanel').hidden = true));
+$('#btnBrowse').addEventListener('click', async () => {
+  const dir = await run(() => api.PickFolder('Choose the folder that holds your projects (e.g. C:\\laragon\\www)'));
+  if (dir) scanImport(dir);
+});
+$('#btnImport').addEventListener('click', async (ev) => {
+  const paths = [...document.querySelectorAll('#impList input:checked')].map((i) => i.value);
+  if (!paths.length) return toast('Tick at least one project', true);
+  const added = await run(() => api.ImportProjects(paths), ev.currentTarget);
+  if (added) {
+    await refreshProjects();
+    toast(`Added ${added.length} project(s)`);
+    scanImport($('#impDir').value);
+  }
+});
+$('#btnImportDb').addEventListener('click', async (ev) => {
+  const dbs = [...document.querySelectorAll('#dbList input:checked')].map((i) => i.value);
+  if (!dbs.length) return toast('Tick at least one database', true);
+  const btn = ev.currentTarget;
+  btn.textContent = 'Copying…';
+  const ok = await run(async () => { await api.ImportDatabases(impRoot, dbs); return true; }, btn);
+  btn.textContent = 'Copy selected databases';
+  if (ok) toast(`Copied ${dbs.length} database(s) into LokalKit's MySQL`);
+});
 
 on('projects', () => refreshProjects());
 

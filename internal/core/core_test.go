@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -35,7 +36,7 @@ func TestConfigValidate(t *testing.T) {
 func TestLoadConfigCreatesDefault(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "lokalkit.json")
 	cfg, err := LoadConfig(p)
-	if err != nil || cfg != DefaultConfig() || !exists(p) {
+	if err != nil || !reflect.DeepEqual(cfg, DefaultConfig()) || !exists(p) {
 		t.Fatalf("got %+v, %v", cfg, err)
 	}
 }

@@ -205,3 +205,17 @@ legend { font-weight: 600; padding: 0 6px; }
 .proj-task { margin-top: 4px; font-size: 12.5px; color: var(--muted); font-family: var(--mono); display: flex; align-items: center; gap: 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .spin { width: 11px; height: 11px; flex: none; border-radius: 50%; border: 2px solid var(--border); border-top-color: var(--accent-text); animation: rot .8s linear infinite; }
 @keyframes rot { to { transform: rotate(360deg); } }
+
+.import-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px; }
+.import-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.import-src { display: flex; gap: 8px; }
+.import-src input { flex: 1; border: 1px solid var(--border); background: var(--bg); border-radius: 8px; padding: 6px 10px; font-family: var(--mono); font-size: 12.5px; color: var(--text); }
+.imp-list { display: flex; flex-direction: column; gap: 4px; max-height: 240px; overflow: auto; }
+.imp-row { display: grid; grid-template-columns: 20px 1fr auto; gap: 10px; align-items: center; padding: 6px 8px; border-radius: 6px; background: var(--surface-2); font-size: 13px; }
+.imp-row input { margin: 0; accent-color: var(--accent-text); }
+.imp-row .muted-text { font-family: var(--mono); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.imp-note { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.imp-note.err { color: var(--err); }
+.imp-note.ok { color: var(--ok); }
+.imp-dbs { border-top: 1px solid var(--border); padding-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.badge.linked { background: var(--surface-2); color: var(--muted); border: 1px dashed var(--border); }

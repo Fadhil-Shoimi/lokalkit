@@ -69,6 +69,14 @@ You can keep several PHP versions in `bin\php\` and pick one from the menu at th
 
 The first time Apache starts with projects, Windows asks for admin rights (UAC) to update the hosts file. This is expected.
 
+## Importing projects from Laragon (or any folder)
+
+**Projects → Import…** finds `C:\laragon\www` automatically (or click **Browse…** for any folder).
+
+- **Projects are linked, not copied**: they stay in their folder with their git history, `vendor` and `node_modules`. LokalKit just serves them at `https://name.localhost` (or `.test`). **Remove** takes a project out of LokalKit without touching its files.
+- **Laravel `.env`**: `APP_URL` is changed to the new address, and `DB_PORT`/`MAIL_PORT` follow LokalKit's settings. The original is saved as `.env.before-lokalkit`.
+- **Databases**: the panel lists the databases in Laragon's MySQL data folder (`C:\laragon\data\mysql-*`). **Copy selected databases** opens that folder with Laragon's own MySQL on a spare port, exports the chosen databases and imports them into LokalKit's MySQL. Close Laragon first and start LokalKit's MySQL. A database with the same name in LokalKit is replaced. The Laragon data itself is not changed.
+
 ## Project domains: `.test` or `.localhost`
 
 - **`.test`** (default) needs entries in the Windows hosts file. LokalKit adds them for you (Windows asks for admin rights).

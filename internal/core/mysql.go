@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -71,6 +72,8 @@ collation-server=utf8mb4_unicode_ci
 max_allowed_packet=128M
 innodb_buffer_pool_size=256M
 log-error="%s/mysql_error.log"
+# LokalKit doesn't use MySQL's X Protocol (port 33060); "loose-" keeps MariaDB happy
+loose-mysqlx=OFF
 
 [client]
 port=%d
@@ -92,7 +95,9 @@ func (s *MySQL) Start() error {
 	}
 	binDir := filepath.Dir(bin)
 	baseDir := filepath.Dir(binDir)
-	if err := os.WriteFile(s.iniPath(), []byte(BuildMyIni(baseDir, s.dataDir(), s.m.P.Logs, port)), 0o644); err != nil {
+	ini := BuildMyIni(baseDir, s.dataDir(), s.m.P.Logs, port)
+	ini = strings.Replace(ini, "\n[client]", "\n"+platformMyIni(s.m.P.Tmp)+"\n[client]", 1)
+	if err := os.WriteFile(s.iniPath(), []byte(ini), 0o644); err != nil {
 		return err
 	}
 	if err := s.initialize(bin, binDir); err != nil {
@@ -182,4 +187,17 @@ func lastLines(s string, n int) string {
 		lines = lines[len(lines)-n:]
 	}
 	return strings.TrimSpace(strings.Join(lines, " | "))
+}
+
+// platformMyIni adds settings needed outside Windows (development/tests):
+// a private socket, and running as root when LokalKit itself runs as root.
+func platformMyIni(tmp string) string {
+	if runtime.GOOS == "windows" {
+		return ""
+	}
+	out := fmt.Sprintf("socket=\"%s/mysqld.sock\"\n", slash(tmp))
+	if os.Geteuid() == 0 {
+		out += "user=root\n"
+	}
+	return out
 }

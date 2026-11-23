@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -108,7 +109,7 @@ func (m *Manager) SaveConfig(c Config) (bool, error) {
 	m.cfg = c
 	m.cfgMu.Unlock()
 	m.Logf("ok", "Settings saved")
-	return old != c && m.anyRunning(), nil
+	return serviceSettingsChanged(old, c) && m.anyRunning(), nil
 }
 
 func (m *Manager) Logf(level, format string, args ...any) {
@@ -367,4 +368,11 @@ func (m *Manager) RestartRunning() error {
 		}
 		return m.Start(s.ID())
 	})
+}
+
+// serviceSettingsChanged reports whether running services must restart.
+// Linked projects only need a reload, which Reload/the watcher handle.
+func serviceSettingsChanged(a, b Config) bool {
+	a.Linked, b.Linked = nil, nil
+	return !reflect.DeepEqual(a, b)
 }

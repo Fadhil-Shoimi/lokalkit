@@ -10,18 +10,25 @@ import (
 
 // Config is saved as lokalkit.json in the root folder.
 type Config struct {
-	ApachePort       int    `json:"apachePort"`
-	MySQLPort        int    `json:"mysqlPort"`
-	MailpitSMTPPort  int    `json:"mailpitSmtpPort"`
-	MailpitHTTPPort  int    `json:"mailpitHttpPort"`
-	PHPVersion       string `json:"phpVersion"` // folder name inside bin/php; empty = newest
-	TLD              string `json:"tld"`
-	AutoVhost        bool   `json:"autoVhost"`
-	StartAllOnLaunch bool   `json:"startAllOnLaunch"`
-	StopAllOnExit    bool   `json:"stopAllOnExit"`
-	MinimizeToTray   bool   `json:"minimizeToTray"` // close button hides to the system tray
-	SSL              bool   `json:"ssl"`            // HTTPS for every project (https://name.test)
-	SSLPort          int    `json:"sslPort"`
+	ApachePort       int             `json:"apachePort"`
+	MySQLPort        int             `json:"mysqlPort"`
+	MailpitSMTPPort  int             `json:"mailpitSmtpPort"`
+	MailpitHTTPPort  int             `json:"mailpitHttpPort"`
+	PHPVersion       string          `json:"phpVersion"` // folder name inside bin/php; empty = newest
+	TLD              string          `json:"tld"`
+	AutoVhost        bool            `json:"autoVhost"`
+	StartAllOnLaunch bool            `json:"startAllOnLaunch"`
+	StopAllOnExit    bool            `json:"stopAllOnExit"`
+	MinimizeToTray   bool            `json:"minimizeToTray"` // close button hides to the system tray
+	SSL              bool            `json:"ssl"`            // HTTPS for every project (https://name.test)
+	SSLPort          int             `json:"sslPort"`
+	Linked           []LinkedProject `json:"linkedProjects,omitempty"` // project folders outside www
+}
+
+// LinkedProject is a project folder that stays where it is (e.g. C:\laragon\www\shop).
+type LinkedProject struct {
+	Name string `json:"name"`
+	Path string `json:"path"`
 }
 
 func DefaultConfig() Config {

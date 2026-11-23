@@ -67,7 +67,32 @@
           <option value="laravel-livewire">Laravel + Livewire starter kit</option>
         </select>
         <button class="btn primary" type="submit">+ Create</button>
+        <button class="btn" type="button" id="btnShowImport" title="Add projects you already have, e.g. from Laragon">Import…</button>
       </form>
+      <div class="import-panel" id="importPanel" hidden>
+        <div class="import-head">
+          <div><b>Import existing projects</b><div class="muted-text">Projects stay in their current folder. Nothing is copied or moved.</div></div>
+          <button type="button" class="btn small ghost" id="btnHideImport">Close</button>
+        </div>
+        <div class="import-src">
+          <input id="impDir" readonly placeholder="Choose a folder (e.g. C:\laragon\www)"/>
+          <button type="button" class="btn small" id="btnBrowse">Browse…</button>
+        </div>
+        <div id="impList" class="imp-list"></div>
+        <div class="install-foot">
+          <span class="muted-text">For Laravel, APP_URL in .env is updated (a backup is kept as .env.before-lokalkit).</span>
+          <button type="button" class="btn primary" id="btnImport">Add selected</button>
+        </div>
+        <div id="impDbs" class="imp-dbs" hidden>
+          <b>Databases</b>
+          <div class="muted-text" id="impDbHint"></div>
+          <div id="dbList" class="imp-list"></div>
+          <div class="install-foot">
+            <span class="muted-text">Close Laragon first, and start LokalKit's MySQL. Databases with the same name in LokalKit are replaced.</span>
+            <button type="button" class="btn" id="btnImportDb">Copy selected databases</button>
+          </div>
+        </div>
+      </div>
       <div id="projects" class="projects"></div>
     </section>
 

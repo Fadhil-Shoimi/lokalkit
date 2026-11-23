@@ -18,12 +18,13 @@ type Project struct {
 	DocRoot     string `json:"docRoot"`
 	Host        string `json:"host"`
 	URL         string `json:"url"`
-	HTTPS       string `json:"https"` // https URL when HTTPS is enabled
-	Kind        string `json:"kind"`  // laravel, wordpress, php
-	Task        string `json:"task"`  // set while Composer/Laravel setup runs
-	Error       string `json:"error"` // last Composer/Laravel setup error
-	NeedsDeps   bool   `json:"needsDeps"`
-	NeedsAssets bool   `json:"needsAssets"` // starter kit front-end not built yet // composer.json but no vendor/ (e.g. an interrupted install)
+	HTTPS       string `json:"https"`       // https URL when HTTPS is enabled
+	Kind        string `json:"kind"`        // laravel, wordpress, php
+	Linked      bool   `json:"linked"`      // folder lives outside www (imported)
+	Task        string `json:"task"`        // set while Composer/Laravel setup runs
+	Error       string `json:"error"`       // last Composer/Laravel setup error
+	NeedsDeps   bool   `json:"needsDeps"`   // composer.json but no vendor/
+	NeedsAssets bool   `json:"needsAssets"` // starter kit front-end not built yet
 }
 
 var hostLabelRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
@@ -44,43 +45,58 @@ func (m *Manager) Projects() []Project {
 }
 
 func ScanProjects(www string, cfg Config) []Project {
-	entries, err := os.ReadDir(www)
-	if err != nil {
-		return nil
-	}
 	var out []Project
+	seen := map[string]bool{}
+	entries, _ := os.ReadDir(www)
 	for _, e := range entries {
 		if !e.IsDir() || strings.HasPrefix(e.Name(), ".") {
 			continue
 		}
-		label := HostLabel(e.Name())
-		if label == "" {
+		if p, ok := projectFromDir(e.Name(), filepath.Join(www, e.Name()), cfg); ok {
+			seen[p.Host] = true
+			out = append(out, p)
+		}
+	}
+	// Projects linked from other folders (e.g. imported from Laragon).
+	for _, l := range cfg.Linked {
+		if !isDir(l.Path) {
 			continue
 		}
-		dir := filepath.Join(www, e.Name())
-		p := Project{Name: e.Name(), Path: dir, DocRoot: dir, Host: label + "." + cfg.TLD, Kind: "php"}
-		if isDir(filepath.Join(dir, "public")) {
-			p.DocRoot = filepath.Join(dir, "public")
+		if p, ok := projectFromDir(l.Name, l.Path, cfg); ok && !seen[p.Host] {
+			p.Linked = true
+			seen[p.Host] = true
+			out = append(out, p)
 		}
-		switch {
-		case exists(filepath.Join(dir, "artisan")):
-			p.Kind = "laravel"
-		case exists(filepath.Join(dir, "wp-config.php")) || exists(filepath.Join(dir, "wp-login.php")):
-			p.Kind = "wordpress"
-		}
-		p.URL = "http://" + p.Host
-		if cfg.ApachePort != 80 {
-			p.URL += fmt.Sprintf(":%d", cfg.ApachePort)
-		}
-		if cfg.SSL {
-			p.HTTPS = "https://" + p.Host
-			if cfg.SSLPort != 443 {
-				p.HTTPS += fmt.Sprintf(":%d", cfg.SSLPort)
-			}
-		}
-		out = append(out, p)
 	}
 	return out
+}
+
+func projectFromDir(name, dir string, cfg Config) (Project, bool) {
+	label := HostLabel(name)
+	if label == "" {
+		return Project{}, false
+	}
+	p := Project{Name: name, Path: dir, DocRoot: dir, Host: label + "." + cfg.TLD, Kind: "php"}
+	if isDir(filepath.Join(dir, "public")) {
+		p.DocRoot = filepath.Join(dir, "public")
+	}
+	switch {
+	case exists(filepath.Join(dir, "artisan")):
+		p.Kind = "laravel"
+	case exists(filepath.Join(dir, "wp-config.php")) || exists(filepath.Join(dir, "wp-login.php")):
+		p.Kind = "wordpress"
+	}
+	p.URL = "http://" + p.Host
+	if cfg.ApachePort != 80 {
+		p.URL += fmt.Sprintf(":%d", cfg.ApachePort)
+	}
+	if cfg.SSL {
+		p.HTTPS = "https://" + p.Host
+		if cfg.SSLPort != 443 {
+			p.HTTPS += fmt.Sprintf(":%d", cfg.SSLPort)
+		}
+	}
+	return p, true
 }
 
 func BuildVhost(p Project, port int) string {
