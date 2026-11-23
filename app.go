@@ -277,6 +277,14 @@ func (a *App) SaveConfig(c core.Config) error {
 	return nil
 }
 
+// RepairProject installs missing Composer packages and finishes Laravel setup.
+func (a *App) RepairProject(name string) error {
+	if err := a.ready(); err != nil {
+		return err
+	}
+	return a.m.RepairProject(name)
+}
+
 // FixHosts adds every project to the Windows hosts file (asks for admin).
 func (a *App) FixHosts() ([]string, error) {
 	if err := a.ready(); err != nil {

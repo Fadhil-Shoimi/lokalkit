@@ -51,6 +51,8 @@ type Manager struct {
 
 	trustAsked bool // asked Windows to trust the CA during this session
 
+	tasks projectTasks // background Composer/Laravel jobs per project
+
 	watchMu sync.Mutex
 	projSig string // last seen projects signature (see WatchProjects)
 }

@@ -77,6 +77,8 @@ function renderProjects(projects) {
                <a class="proj-url alt" data-url="${esc(p.url)}">http</a>`
             : `<a class="proj-url" data-url="${esc(p.url)}" title="${apacheUp ? 'Open in browser' : 'Start Apache first'}">${esc(p.url)}</a>`}
         </div>
+        ${p.task ? `<div class="proj-task"><span class="spin"></span>${esc(p.task)}</div>`
+          : p.needsDeps ? `<div class="proj-warn">⚠ Composer packages are missing (vendor folder), so the app can't run. <button class="linkish" data-repair="${esc(p.name)}">Repair</button></div>` : ''}
         ${(state.missingHosts || []).includes(p.host) ? `<div class="proj-warn">⚠ Not in the Windows hosts file yet, so browsers can't find it. <button class="linkish" data-fixhosts="1">Fix now</button> or <button class="linkish" data-uselocalhost="1">use .localhost instead</button> (works without the hosts file)</div>` : ''}
       </div>
       <div class="proj-btns">
@@ -228,6 +230,8 @@ document.addEventListener('click', (ev) => {
       renderProjects(state.projects);
       if (!state.missingHosts.length) toast('Hosts file updated. Reload the page in your browser.');
     }, t);
+  } else if (t.dataset.repair) {
+    run(async () => { await api.RepairProject(t.dataset.repair); await refreshProjects(); toast('Installing packages… progress shows on the project'); }, t);
   } else if (t.dataset.uselocalhost) {
     run(async () => {
       await api.UseLocalhostDomain();
@@ -273,7 +277,7 @@ $('#newProject').addEventListener('submit', async (ev) => {
   if (p) {
     $('#npName').value = '';
     await refreshProjects();
-    toast(`Project ${p.name} created → ${p.https || p.url || ''}`);
+    toast($('#npKind').value === 'laravel' ? `Installing Laravel into ${p.name}… this takes a few minutes` : `Project ${p.name} created → ${p.https || p.url || ''}`);
   }
 });
 

@@ -145,23 +145,12 @@ func (m *Manager) CreateProject(name, kind string) (Project, error) {
 	}
 	switch kind {
 	case "laravel":
-		if m.ensureComposerShim() == "" {
+		if !exists(filepath.Join(m.P.Bin, "composer", "composer.phar")) {
 			_ = os.Remove(dir)
-			return Project{}, errors.New("Composer not found. Put composer.phar in bin\\composer")
+			return Project{}, errors.New("Composer not found. Install it from the Install tab")
 		}
-		if err := m.OpenTerminal(dir, "composer create-project laravel/laravel . && echo. && echo Done! Your Laravel project is ready."); err != nil {
-			return Project{}, err
-		}
-		// Create a database with the same name if MySQL is running.
-		if s, _ := m.service("mysql"); s.Running() {
-			db := "`" + filepathSafeDB(name) + "`"
-			if err := s.(*MySQL).Exec("CREATE DATABASE IF NOT EXISTS " + db + " CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"); err != nil {
-				m.Logf("error", "Failed to create database: %v", err)
-			} else {
-				m.Logf("ok", "Database %s created", filepathSafeDB(name))
-			}
-		}
-		// The www watcher reloads again once Laravel's public/ folder appears.
+		// Runs in the background; progress shows on the project row.
+		go m.installLaravel(name, dir, true)
 	default:
 		page := fmt.Sprintf("<?php\n// Project %s, created by LokalKit\n?>\n<!doctype html>\n<html><head><meta charset=\"utf-8\"><title>%s</title></head>\n<body style=\"font-family:system-ui;padding:40px\">\n<h1>%s</h1>\n<p>PHP <?= PHP_VERSION ?> is running. Edit this file at <code><?= __FILE__ ?></code></p>\n</body></html>\n", name, name, name)
 		if err := os.WriteFile(filepath.Join(dir, "index.php"), []byte(page), 0o644); err != nil {

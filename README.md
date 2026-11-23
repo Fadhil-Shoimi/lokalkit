@@ -17,7 +17,7 @@ A local PHP development environment for Windows. **Apache + PHP + MySQL + Mailpi
 - MySQL is initialized on first start (`root`, no password)
 - PHP `mail()` goes straight to Mailpit
 - Quick buttons: Web, Database (HeidiSQL/Adminer), Terminal (PHP, Composer and MySQL on PATH), www folder
-- Create new projects: blank PHP or **Laravel** (a database is created too)
+- Create new projects: blank PHP or **Laravel**. Composer runs inside LokalKit with progress on the project; `.env` is set up for you (HTTPS `APP_URL`, MySQL database + migrations when MySQL is running, Mailpit). Projects with missing `vendor` packages get a **Repair** button
 - **System tray**: a switch icon in the taskbar (yellow = services running, grey = stopped). Click to open, right-click to start/stop services and for shortcuts. The X button hides the app to the tray (configurable in Settings)
 - **One-click installer**: download Apache, PHP, MySQL, Mailpit, Composer, Adminer and the Visual C++ Runtime from their official sites, with SHA-256 checks where the source publishes them
 - Configurable ports. Everything lives in one folder, so the install is portable

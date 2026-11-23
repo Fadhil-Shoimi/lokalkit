@@ -13,13 +13,15 @@ import (
 )
 
 type Project struct {
-	Name    string `json:"name"`
-	Path    string `json:"path"`
-	DocRoot string `json:"docRoot"`
-	Host    string `json:"host"`
-	URL     string `json:"url"`
-	HTTPS   string `json:"https"` // https URL when HTTPS is enabled
-	Kind    string `json:"kind"`  // laravel, wordpress, php
+	Name      string `json:"name"`
+	Path      string `json:"path"`
+	DocRoot   string `json:"docRoot"`
+	Host      string `json:"host"`
+	URL       string `json:"url"`
+	HTTPS     string `json:"https"`     // https URL when HTTPS is enabled
+	Kind      string `json:"kind"`      // laravel, wordpress, php
+	Task      string `json:"task"`      // set while Composer/Laravel setup runs
+	NeedsDeps bool   `json:"needsDeps"` // composer.json but no vendor/ (e.g. an interrupted install)
 }
 
 var hostLabelRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
@@ -36,7 +38,7 @@ func HostLabel(name string) string {
 
 // Projects lists every folder in www that can become a virtual host.
 func (m *Manager) Projects() []Project {
-	return ScanProjects(m.P.WWW, m.config())
+	return m.annotate(ScanProjects(m.P.WWW, m.config()))
 }
 
 func ScanProjects(www string, cfg Config) []Project {
