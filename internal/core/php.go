@@ -71,7 +71,7 @@ var phpExtensions = []string{
 func (m *Manager) EnsurePHPIni(php PHPInstall) error {
 	ini := filepath.Join(php.Dir, "php.ini")
 	if exists(ini) {
-		return nil
+		return m.fixExtensionDir(php, ini)
 	}
 	var src []byte
 	var err error
@@ -126,4 +126,42 @@ func BuildPHPIni(src, phpDir string, smtpPort int, hasExt func(string) bool) str
 		s = setKey(s, kv[0], kv[1])
 	}
 	return s
+}
+
+var extDirRe = regexp.MustCompile(`(?m)^[ \t]*extension_dir[ \t]*=[ \t]*"?([^"\r\n;]*)"?.*$`)
+
+// fixExtensionDir repairs an extension_dir that points somewhere else: the
+// LokalKit folder was moved, or php.ini was copied from another install
+// (e.g. Laragon). Without it PHP loads no extensions (openssl, zip, curl...).
+func (m *Manager) fixExtensionDir(php PHPInstall, ini string) error {
+	b, err := os.ReadFile(ini)
+	if err != nil {
+		return err
+	}
+	want := slash(filepath.Join(php.Dir, "ext"))
+	fixed, changed := FixExtensionDir(string(b), want)
+	if !changed {
+		return nil
+	}
+	m.Logf("info", "Fixed extension_dir in %s (it pointed to another folder)", ini)
+	return os.WriteFile(ini, []byte(fixed), 0o644)
+}
+
+// FixExtensionDir points an absolute extension_dir at want. Relative values
+// and the right path are left alone.
+func FixExtensionDir(ini, want string) (string, bool) {
+	loc := extDirRe.FindStringSubmatchIndex(ini)
+	if loc == nil {
+		return ini, false
+	}
+	cur := strings.TrimSpace(ini[loc[2]:loc[3]])
+	isAbs := filepath.IsAbs(cur) || strings.HasPrefix(cur, "/") || (len(cur) > 2 && cur[1] == ':')
+	if !isAbs || strings.EqualFold(strings.TrimRight(filepath.ToSlash(cur), "/"), strings.TrimRight(want, "/")) {
+		return ini, false
+	}
+	end := loc[1]
+	if end > loc[0] && ini[end-1] == '\r' {
+		end--
+	}
+	return ini[:loc[0]] + `extension_dir = "` + want + `"` + ini[end:], true
 }

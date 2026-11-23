@@ -340,3 +340,25 @@ func TestLocalhostTLD(t *testing.T) {
 		t.Errorf("url %q", p.HTTPS)
 	}
 }
+
+func TestFixExtensionDir(t *testing.T) {
+	want := "C:/LokalKit/bin/php/php-8.3.37/ext"
+	stale := "; ext\r\nextension_dir = \"C:/Users/me/Downloads/LokalKit-windows-amd64/bin/php/php-8.3.37/ext\"\r\nextension=openssl\r\n"
+	out, changed := FixExtensionDir(stale, want)
+	if !changed || !strings.Contains(out, "extension_dir = \""+want+"\"\r\nextension=openssl") {
+		t.Errorf("not fixed: %q", out)
+	}
+	if _, changed := FixExtensionDir(out, want); changed {
+		t.Error("already correct should be untouched")
+	}
+	if _, changed := FixExtensionDir("extension_dir = \"ext\"\n", want); changed {
+		t.Error("relative value should be untouched")
+	}
+	if _, changed := FixExtensionDir(";extension_dir = \"C:/old/ext\"\n", want); changed {
+		t.Error("commented line should be untouched")
+	}
+	laragon := "extension_dir = \"C:/laragon/bin/php/php-8.3.30-Win32-vs16-x64/ext\"\n"
+	if out, changed := FixExtensionDir(laragon, want); !changed || !strings.Contains(out, want) {
+		t.Error("Laragon path should be fixed")
+	}
+}

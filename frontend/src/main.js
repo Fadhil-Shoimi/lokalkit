@@ -78,6 +78,7 @@ function renderProjects(projects) {
             : `<a class="proj-url" data-url="${esc(p.url)}" title="${apacheUp ? 'Open in browser' : 'Start Apache first'}">${esc(p.url)}</a>`}
         </div>
         ${p.task ? `<div class="proj-task"><span class="spin"></span>${esc(p.task)}</div>`
+          : p.error ? `<div class="proj-warn">⚠ Laravel setup failed: ${esc(p.error)} <button class="linkish" data-repair="${esc(p.name)}">Retry</button></div>`
           : p.needsDeps ? `<div class="proj-warn">⚠ Composer packages are missing (vendor folder), so the app can't run. <button class="linkish" data-repair="${esc(p.name)}">Repair</button></div>` : ''}
         ${(state.missingHosts || []).includes(p.host) ? `<div class="proj-warn">⚠ Not in the Windows hosts file yet, so browsers can't find it. <button class="linkish" data-fixhosts="1">Fix now</button> or <button class="linkish" data-uselocalhost="1">use .localhost instead</button> (works without the hosts file)</div>` : ''}
       </div>

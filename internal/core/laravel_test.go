@@ -135,3 +135,23 @@ func TestSetEnvValues(t *testing.T) {
 		t.Error("commented key should be replaced")
 	}
 }
+
+func TestRetryAfterFailedCreate(t *testing.T) {
+	m := newTestManager(t)
+	fakePHP(t, m, true)
+	m.CreateProject("again", "laravel")
+	waitTask(t, m, "again")
+	p := m.findProject("again")
+	if p.Error == "" {
+		t.Fatal("failure should be shown on the project")
+	}
+	fakePHP(t, m, false) // e.g. extensions fixed
+	if err := m.RepairProject("again"); err != nil {
+		t.Fatal(err)
+	}
+	waitTask(t, m, "again")
+	p = m.findProject("again")
+	if p.Error != "" || p.NeedsDeps || p.Kind != "laravel" {
+		t.Fatalf("retry should create the project from scratch: %+v", p)
+	}
+}

@@ -21,6 +21,7 @@ type Project struct {
 	HTTPS     string `json:"https"`     // https URL when HTTPS is enabled
 	Kind      string `json:"kind"`      // laravel, wordpress, php
 	Task      string `json:"task"`      // set while Composer/Laravel setup runs
+	Error     string `json:"error"`     // last Composer/Laravel setup error
 	NeedsDeps bool   `json:"needsDeps"` // composer.json but no vendor/ (e.g. an interrupted install)
 }
 

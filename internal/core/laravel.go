@@ -20,8 +20,28 @@ import (
 // the app knows when it finishes or fails and can finish the setup itself.
 
 type projectTasks struct {
-	mu    sync.Mutex
-	state map[string]string // project name -> status text while busy
+	mu     sync.Mutex
+	state  map[string]string // project name -> status text while busy
+	errors map[string]string // project name -> last setup error
+}
+
+func (t *projectTasks) setError(name, msg string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.errors == nil {
+		t.errors = map[string]string{}
+	}
+	if msg == "" {
+		delete(t.errors, name)
+	} else {
+		t.errors[name] = msg
+	}
+}
+
+func (t *projectTasks) getError(name string) string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.errors[name]
 }
 
 func (t *projectTasks) set(name, status string) {
@@ -48,6 +68,7 @@ func (t *projectTasks) get(name string) (string, bool) {
 func (m *Manager) annotate(ps []Project) []Project {
 	for i := range ps {
 		ps[i].Task, _ = m.tasks.get(ps[i].Name)
+		ps[i].Error = m.tasks.getError(ps[i].Name)
 		ps[i].NeedsDeps = exists(filepath.Join(ps[i].Path, "composer.json")) &&
 			!exists(filepath.Join(ps[i].Path, "vendor", "autoload.php"))
 	}
@@ -160,7 +181,10 @@ func (m *Manager) installLaravel(name, dir string, fresh bool) {
 	finish := func(err error) {
 		m.tasks.set(name, "")
 		if err != nil {
+			m.tasks.setError(name, trimTo(err.Error(), 300))
 			m.Logf("error", "Laravel setup for %s failed: %v. Full output: %s", name, err, logFile)
+		} else {
+			m.tasks.setError(name, "")
 		}
 		m.emit("projects", m.Projects())
 		if err == nil {
@@ -329,6 +353,8 @@ func (m *Manager) RepairProject(name string) error {
 	if _, busy := m.tasks.get(name); busy {
 		return errors.New("this project is already being set up")
 	}
-	go m.installLaravel(name, p.Path, false)
+	// An empty folder means "composer create-project" never got going: start over.
+	entries, _ := os.ReadDir(p.Path)
+	go m.installLaravel(name, p.Path, len(entries) == 0)
 	return nil
 }
