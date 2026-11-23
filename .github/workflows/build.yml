@@ -26,7 +26,15 @@ jobs:
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.1
       - name: Build
-        run: wails build -platform windows/amd64 -clean
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            # Stamp the release version into the app (used by auto-update).
+            v="${{ github.event.release.tag_name }}"
+            wails build -platform windows/amd64 -clean -ldflags "-X main.AppVersion=${v#v}"
+          else
+            wails build -platform windows/amd64 -clean
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: LokalKit-windows-amd64
@@ -40,4 +48,6 @@ jobs:
           tag="${{ github.event.release.tag_name }}"
           # The release may already exist (published from the GitHub website); create it if not.
           gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --generate-notes --title "LokalKit $tag"
-          gh release upload "$tag" build/bin/LokalKit.exe --clobber
+          # Checksum file lets LokalKit verify the download before updating itself.
+          (cd build/bin && sha256sum LokalKit.exe > LokalKit.exe.sha256)
+          gh release upload "$tag" build/bin/LokalKit.exe build/bin/LokalKit.exe.sha256 --clobber

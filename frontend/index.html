@@ -30,6 +30,13 @@
   <main>
    <div class="wrap">
     <div id="fatal" class="fatal" hidden></div>
+    <div class="card update-banner" id="updateBanner" hidden>
+      <span data-icon="up" class="ub-icon"></span>
+      <div class="ub-text"><b id="ubTitle"></b><div class="muted-text" id="ubSub"></div></div>
+      <button class="btn small ghost" id="ubNotes">What's new</button>
+      <button class="btn small primary" id="ubInstall">Update &amp; restart</button>
+      <button class="btn small ghost" id="ubLater" title="Hide until next start">Later</button>
+    </div>
 
     <section class="services" id="services"></section>
 
@@ -188,6 +195,14 @@
           <label class="check"><input type="checkbox" name="startAllOnLaunch"/> Start all services when LokalKit opens</label>
           <label class="check"><input type="checkbox" name="minimizeToTray"/> Close button (X) hides LokalKit to the system tray</label>
           <label class="check"><input type="checkbox" name="stopAllOnExit"/> Stop all services when quitting LokalKit</label>
+        </fieldset>
+        <fieldset>
+          <legend>LokalKit updates</legend>
+          <label class="check"><input type="checkbox" name="checkUpdates"/> Check for new versions automatically</label>
+          <div class="ssl-status">
+            <span class="muted-text" id="updStatus"></span>
+            <button type="button" class="btn small" id="btnCheckUpdate" data-icon="refresh">Check now</button>
+          </div>
         </fieldset>
         <div class="settings-foot">
           <span class="muted" id="rootPath"></span>

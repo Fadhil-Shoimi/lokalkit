@@ -1,8 +1,13 @@
 package main
 
 import (
+	"strconv"
+	"strings"
+	"time"
+
 	"embed"
 	"fmt"
+	"lokalkit/internal/updater"
 	"os"
 
 	"lokalkit/internal/core"
@@ -28,6 +33,19 @@ func main() {
 	}
 
 	app := NewApp()
+	// After an update the new LokalKit is started with
+	// "--wait-pid <old pid> --resume apache,mysql": wait for the old one to
+	// exit, then start the services that were running.
+	for i := 1; i < len(os.Args)-1; i++ {
+		switch os.Args[i] {
+		case "--wait-pid":
+			if pid, err := strconv.Atoi(os.Args[i+1]); err == nil {
+				updater.WaitForExit(pid, 30*time.Second)
+			}
+		case "--resume":
+			app.resume = strings.Split(os.Args[i+1], ",")
+		}
+	}
 	err := wails.Run(&options.App{
 		Title: "LokalKit",
 		// Fixed size that fits the layout (1120px content + margins);

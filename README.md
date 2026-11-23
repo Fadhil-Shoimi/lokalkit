@@ -72,6 +72,12 @@ You can keep several PHP versions in `bin\php\` and pick one from the menu at th
 
 The first time Apache starts with projects, Windows asks for admin rights (UAC) to update the hosts file. This is expected.
 
+## Updates
+
+LokalKit checks GitHub Releases at start (every 12 hours at most) and shows a banner when a newer version exists. **Update & restart** downloads the new `LokalKit.exe`, verifies it against `LokalKit.exe.sha256`, swaps it in (the old one is kept as `LokalKit.old.exe` until the next start), restarts, and starts the services that were running. Turn it off in **Settings → LokalKit updates**.
+
+Publishing a release: create a release with a tag such as `v0.2.0` on GitHub. The build workflow stamps that version into the app and attaches `LokalKit.exe` and `LokalKit.exe.sha256`. **The repository (or a separate releases repository set in `internal/updater/updater.go`) must be public** for LokalKit to see releases.
+
 ## Databases tab
 
 - Lists the databases in LokalKit's MySQL with their size, number of tables and the projects whose `.env` uses them

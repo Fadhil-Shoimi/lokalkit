@@ -314,3 +314,8 @@ legend { font-weight: 600; padding: 0 6px; }
 .db-name { font-family: var(--mono); font-weight: 600; }
 .btn.danger-ghost { background: transparent; border-color: transparent; color: var(--err); }
 .btn.danger-ghost:hover { background: var(--err-soft); }
+
+/* ---------- update banner ---------- */
+.update-banner { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); background: var(--accent-soft); }
+.update-banner .ub-icon .ico { width: 20px; height: 20px; color: var(--accent-text); }
+.ub-text { flex: 1; min-width: 0; }

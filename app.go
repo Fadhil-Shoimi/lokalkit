@@ -3,7 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -11,11 +14,14 @@ import (
 	"lokalkit/internal/core"
 	"lokalkit/internal/installer"
 	"lokalkit/internal/tray"
+	"lokalkit/internal/updater"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-const AppVersion = "0.1.0"
+// AppVersion is set at build time for releases:
+// wails build -ldflags "-X main.AppVersion=0.2.0"
+var AppVersion = "0.1.0-dev"
 
 // App is the bridge between the Go engine and the web UI.
 // Every exported method is callable from JavaScript.
@@ -26,6 +32,14 @@ type App struct {
 	tray      *tray.Tray
 	inst      *installer.Installer
 	stopWatch chan struct{}
+
+	resume []string // services to start after an update restart
+
+	updMu      sync.Mutex
+	updChecked time.Time
+	updRelease *updater.Release
+	updErr     string
+	updBusy    bool
 
 	phpMu      sync.Mutex
 	phpChecked time.Time
@@ -60,6 +74,27 @@ func (a *App) startup(ctx context.Context) {
 	a.stopWatch = make(chan struct{})
 	go m.WatchProjects(a.stopWatch)
 	m.Logf("info", "LokalKit %s ready. Folder: %s", AppVersion, m.P.Root)
+	if exe, err := os.Executable(); err == nil {
+		updater.Cleanup(exe) // remove LokalKit.old.exe from a previous update
+	}
+	if len(a.resume) > 0 {
+		m.Logf("ok", "Updated to LokalKit %s", AppVersion)
+		go func(ids []string) {
+			for _, id := range ids {
+				if id != "" {
+					_ = m.Start(id)
+				}
+			}
+		}(a.resume)
+	}
+	if m.Config().CheckUpdates {
+		go func() {
+			time.Sleep(5 * time.Second)
+			if info := a.CheckForUpdate(false); info.Available {
+				runtime.EventsEmit(ctx, "update-available", info)
+			}
+		}()
+	}
 	if m.Config().StartAllOnLaunch {
 		go m.StartAll()
 	}
@@ -385,6 +420,90 @@ func (a *App) confirmTrust() bool {
 		CancelButton:  "Not now",
 	})
 	return err != nil || res == "Continue" || res == "Yes" || res == "Ok"
+}
+
+// ---------- LokalKit updates ----------
+
+type UpdateInfo struct {
+	Current   string `json:"current"`
+	Latest    string `json:"latest"`
+	Available bool   `json:"available"`
+	Notes     string `json:"notes"`
+	PageURL   string `json:"pageUrl"`
+	Error     string `json:"error"`
+}
+
+// CheckForUpdate asks GitHub Releases for a newer LokalKit (cached 12h).
+func (a *App) CheckForUpdate(force bool) UpdateInfo {
+	a.updMu.Lock()
+	defer a.updMu.Unlock()
+	if force || time.Since(a.updChecked) > 12*time.Hour {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		rel, err := updater.Latest(ctx, updater.FeedURL)
+		a.updChecked, a.updRelease, a.updErr = time.Now(), rel, ""
+		if err != nil {
+			a.updErr = err.Error()
+		}
+	}
+	info := UpdateInfo{Current: AppVersion, Error: a.updErr}
+	if r := a.updRelease; r != nil {
+		info.Latest, info.Notes, info.PageURL = r.Version, r.Notes, r.PageURL
+		info.Available = updater.Newer(r.Version, AppVersion)
+	}
+	return info
+}
+
+// InstallUpdate downloads the new LokalKit.exe, swaps it in and restarts.
+// Services that were running are started again by the new version.
+func (a *App) InstallUpdate() error {
+	if err := a.ready(); err != nil {
+		return err
+	}
+	a.updMu.Lock()
+	rel := a.updRelease
+	if a.updBusy {
+		a.updMu.Unlock()
+		return fmt.Errorf("an update is already running")
+	}
+	a.updBusy = true
+	a.updMu.Unlock()
+	defer func() { a.updMu.Lock(); a.updBusy = false; a.updMu.Unlock() }()
+	if rel == nil || !updater.Newer(rel.Version, AppVersion) {
+		return fmt.Errorf("no update available")
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	tmp := filepath.Join(a.m.P.Tmp, "LokalKit-update.exe")
+	a.m.Logf("info", "Downloading LokalKit %s...", rel.Version)
+	err = updater.Download(context.Background(), rel, tmp, func(got, total int64) {
+		runtime.EventsEmit(a.ctx, "update-progress", map[string]int64{"received": got, "total": total})
+	})
+	if err != nil {
+		a.m.Logf("error", "Update download failed: %v", err)
+		return err
+	}
+	var running []string
+	for _, s := range a.m.Services() {
+		if s.Running {
+			running = append(running, s.ID)
+		}
+	}
+	if err := updater.Replace(exe, tmp); err != nil {
+		return err
+	}
+	a.m.Logf("info", "Restarting into LokalKit %s...", rel.Version)
+	_ = a.m.StopAll() // free the ports for the new version
+	cmd := exec.Command(exe, "--wait-pid", strconv.Itoa(os.Getpid()), "--resume", strings.Join(running, ","))
+	cmd.Dir = filepath.Dir(exe)
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("new version installed, but it could not be started (open LokalKit again): %w", err)
+	}
+	a.quitting = true
+	runtime.Quit(a.ctx)
+	return nil
 }
 
 // ---------- Databases tab ----------

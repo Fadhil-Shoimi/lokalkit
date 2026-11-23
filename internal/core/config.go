@@ -22,6 +22,7 @@ type Config struct {
 	MinimizeToTray   bool            `json:"minimizeToTray"` // close button hides to the system tray
 	SSL              bool            `json:"ssl"`            // HTTPS for every project (https://name.test)
 	SSLPort          int             `json:"sslPort"`
+	CheckUpdates     bool            `json:"checkUpdates"`             // look for new LokalKit versions
 	Linked           []LinkedProject `json:"linkedProjects,omitempty"` // project folders outside www
 }
 
@@ -44,6 +45,7 @@ func DefaultConfig() Config {
 		MinimizeToTray:   true,
 		SSL:              true,
 		SSLPort:          443,
+		CheckUpdates:     true,
 	}
 }
 

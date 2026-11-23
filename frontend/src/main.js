@@ -225,6 +225,7 @@ function renderSettings() {
   }
   $('#rootPath').textContent = state.paths?.root || '';
   renderSSL(state.ssl);
+  renderUpdateStatus(updateInfo);
 }
 
 function renderSSL(ssl) {
@@ -473,6 +474,7 @@ $('#settings').addEventListener('submit', async (ev) => {
     minimizeToTray: f.minimizeToTray.checked,
     ssl: f.ssl.checked,
     sslPort: +f.sslPort.value,
+    checkUpdates: f.checkUpdates.checked,
   };
   const ok = await run(async () => { await api.SaveConfig(cfg); return true; }, ev.submitter);
   if (ok) { toast('Settings saved'); await refresh(); }
@@ -503,6 +505,48 @@ $('#btnInstall').addEventListener('click', async () => {
 });
 
 $('#btnCancelInstall').addEventListener('click', () => api.CancelInstall());
+
+// ---------- LokalKit updates ----------
+
+let updateInfo = null;
+
+function showUpdate(info) {
+  updateInfo = info;
+  const b = $('#updateBanner');
+  if (!info || !info.available) { b.hidden = true; return; }
+  $('#ubTitle').textContent = `LokalKit ${info.latest} is available`;
+  $('#ubSub').textContent = `You have ${info.current}. Updating restarts LokalKit; running services start again by themselves.`;
+  $('#ubNotes').hidden = !info.pageUrl;
+  b.hidden = false;
+}
+
+function renderUpdateStatus(info) {
+  const el = $('#updStatus');
+  if (!info) { el.textContent = `Version ${state.version}`; return; }
+  el.className = 'muted-text' + (info.error ? ' warn' : info.available ? '' : ' ok');
+  el.textContent = info.error ? `Version ${info.current} · couldn't check: ${info.error}`
+    : info.available ? `Version ${info.current} · ${info.latest} is available`
+    : `Version ${info.current} · you have the latest version`;
+}
+
+$('#ubNotes').addEventListener('click', () => updateInfo?.pageUrl && api.OpenURL(updateInfo.pageUrl));
+$('#ubLater').addEventListener('click', () => ($('#updateBanner').hidden = true));
+$('#ubInstall').addEventListener('click', async (ev) => {
+  const btn = ev.currentTarget;
+  btn.textContent = 'Downloading…';
+  const ok = await run(async () => { await api.InstallUpdate(); return true; }, btn);
+  if (!ok) btn.textContent = 'Update & restart';
+  else btn.textContent = 'Restarting…';
+});
+$('#btnCheckUpdate').addEventListener('click', async (ev) => {
+  const info = await run(() => api.CheckForUpdate(true), ev.currentTarget);
+  if (info) { renderUpdateStatus(info); showUpdate(info); }
+});
+on('update-available', (info) => { showUpdate(info); renderUpdateStatus(info); });
+on('update-progress', (p) => {
+  const pct = p.total > 0 ? Math.round((p.received / p.total) * 100) : 0;
+  $('#ubInstall').textContent = pct >= 100 ? 'Installing…' : `Downloading ${pct}%`;
+});
 
 // ---------- databases tab ----------
 
