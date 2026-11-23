@@ -87,7 +87,7 @@ func (s *MySQL) Start() error {
 		return errors.New("MySQL tidak dijumpai. Letak MySQL/MariaDB dalam folder bin\\mysql")
 	}
 	port := s.m.config().MySQLPort
-	if !PortFree(port) {
+	if !waitPortFree(port, 8*time.Second) {
 		return fmt.Errorf("port %d sedang digunakan (MySQL lain sedang berjalan?)", port)
 	}
 	binDir := filepath.Dir(bin)

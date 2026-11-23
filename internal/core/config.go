@@ -20,6 +20,8 @@ type Config struct {
 	StartAllOnLaunch bool   `json:"startAllOnLaunch"`
 	StopAllOnExit    bool   `json:"stopAllOnExit"`
 	MinimizeToTray   bool   `json:"minimizeToTray"` // close button hides to the system tray
+	SSL              bool   `json:"ssl"`            // HTTPS for every project (https://name.test)
+	SSLPort          int    `json:"sslPort"`
 }
 
 func DefaultConfig() Config {
@@ -33,6 +35,8 @@ func DefaultConfig() Config {
 		StartAllOnLaunch: false,
 		StopAllOnExit:    true,
 		MinimizeToTray:   true,
+		SSL:              true,
+		SSLPort:          443,
 	}
 }
 
@@ -49,6 +53,7 @@ var blockedTLDs = map[string]string{
 func (c Config) Validate() error {
 	ports := map[string]int{
 		"Apache":       c.ApachePort,
+		"HTTPS":        c.SSLPort,
 		"MySQL":        c.MySQLPort,
 		"Mailpit SMTP": c.MailpitSMTPPort,
 		"Mailpit Web":  c.MailpitHTTPPort,

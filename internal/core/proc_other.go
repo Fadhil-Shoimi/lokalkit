@@ -3,16 +3,20 @@
 package core
 
 import (
-	"os"
 	"os/exec"
+	"syscall"
 )
 
-func hideWindow(cmd *exec.Cmd) {}
+// hideWindow puts the child in its own process group so killTree can stop
+// it together with any workers it forks (e.g. Apache prefork children).
+func hideWindow(cmd *exec.Cmd) {
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+}
 
 func newConsole(cmd *exec.Cmd) {}
 
 func killTree(pid int) {
-	if p, err := os.FindProcess(pid); err == nil {
-		_ = p.Kill()
+	if err := syscall.Kill(-pid, syscall.SIGKILL); err != nil {
+		_ = syscall.Kill(pid, syscall.SIGKILL)
 	}
 }

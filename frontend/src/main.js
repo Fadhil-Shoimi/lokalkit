@@ -70,7 +70,12 @@ function renderProjects(projects) {
     <div class="proj">
       <div class="proj-main">
         <div class="proj-name">${esc(p.name)}${p.kind !== 'php' ? `<span class="badge ${p.kind}">${p.kind}</span>` : ''}</div>
-        <a class="proj-url" data-url="${esc(p.url)}" title="${apacheUp ? 'Buka dalam pelayar' : 'Mulakan Apache dahulu'}">${esc(p.url)}</a>
+        <div class="proj-links">
+          ${p.https
+            ? `<a class="proj-url" data-url="${esc(p.https)}" title="${apacheUp ? 'Buka dalam pelayar' : 'Mulakan Apache dahulu'}">${esc(p.https)}</a>
+               <a class="proj-url alt" data-url="${esc(p.url)}">http</a>`
+            : `<a class="proj-url" data-url="${esc(p.url)}" title="${apacheUp ? 'Buka dalam pelayar' : 'Mulakan Apache dahulu'}">${esc(p.url)}</a>`}
+        </div>
       </div>
       <div class="proj-btns">
         <button class="btn small" data-folder="${esc(p.name)}">Folder</button>
@@ -109,6 +114,24 @@ function renderSettings() {
     else el.value = v;
   }
   $('#rootPath').textContent = state.paths?.root || '';
+  renderSSL(state.ssl);
+}
+
+function renderSSL(ssl) {
+  const el = $('#sslStatus');
+  const btn = $('#btnTrust');
+  if (!ssl) return;
+  if (!ssl.caExists) {
+    el.textContent = 'Sijil akan dicipta bila Apache dimulakan dengan HTTPS.';
+    el.className = 'muted-text';
+  } else if (ssl.trusted) {
+    el.textContent = '✓ Sijil LokalKit dipercayai oleh Windows';
+    el.className = 'muted-text ok';
+  } else {
+    el.textContent = 'Sijil belum dipercayai: pelayar akan tunjuk amaran.';
+    el.className = 'muted-text warn';
+  }
+  btn.hidden = !ssl.supported || !ssl.caExists || ssl.trusted;
 }
 
 async function refresh() {
@@ -208,9 +231,16 @@ $('#settings').addEventListener('submit', async (ev) => {
     startAllOnLaunch: f.startAllOnLaunch.checked,
     stopAllOnExit: f.stopAllOnExit.checked,
     minimizeToTray: f.minimizeToTray.checked,
+    ssl: f.ssl.checked,
+    sslPort: +f.sslPort.value,
   };
   const ok = await run(async () => { await api.SaveConfig(cfg); return true; }, ev.submitter);
   if (ok) { toast('Tetapan disimpan'); await refresh(); }
+});
+
+$('#btnTrust').addEventListener('click', async (ev) => {
+  const st = await run(() => api.TrustCA(), ev.currentTarget);
+  if (st) { state.ssl = st; renderSSL(st); if (st.trusted) toast('Sijil dipercayai. Mulakan semula pelayar jika perlu.'); }
 });
 
 on('services', (s) => { renderServices(s); renderProjects(state.projects || []); });

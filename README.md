@@ -11,6 +11,7 @@ Persekitaran pembangunan PHP lokal untuk Windows. Satu klik untuk **Apache + PHP
 
 - Mula/Henti Apache, MySQL/MariaDB dan Mailpit (atau **Mula Semua**)
 - **Auto virtual host**: setiap folder dalam `www\` jadi `http://folder.test` (fail hosts dikemas kini automatik, UAC diminta hanya bila perlu)
+- **HTTPS automatik**: setiap projek juga ada `https://folder.test` (dan `https://*.folder.test`), dengan sijil dari CA LokalKit sendiri tanpa perlu mkcert
 - Folder `public\` dikesan automatik (Laravel, Symfony)
 - Tukar versi PHP. `php.ini` dijana sendiri dengan extension biasa dihidupkan
 - MySQL kali pertama disediakan sendiri (`root` tanpa kata laluan)
@@ -64,6 +65,21 @@ Boleh ada beberapa versi PHP dalam `bin\php\`, kemudian pilih versi dari menu at
 4. Tekan **▶ Mula Semua** dan buka `http://localhost`.
 
 Kali pertama Apache dimulakan dengan projek, Windows akan minta kebenaran admin (UAC) untuk kemas kini fail hosts. Ini normal.
+
+## HTTPS (SSL)
+
+Bila Apache dimulakan dengan HTTPS hidup (lalai), LokalKit akan:
+1. Cipta **CA lokal** sekali sahaja dalam `etc\ssl\lokalkit-ca.crt`
+2. Jana satu sijil untuk semua projek (`projek.test`, `*.projek.test`, `localhost`). Sijil dijana semula secara automatik bila projek ditambah
+3. Minta Windows **percayai** CA tu. Tekan **Yes** pada dialog keselamatan Windows (sekali sahaja, tak perlu admin)
+
+Lepas tu `https://projek.test` terus jalan tanpa amaran dalam Chrome dan Edge.
+
+- Dialog terlepas? **Tetapan → HTTPS → Percayai sijil**
+- **Firefox**: kalau masih ada amaran, buka `about:config`, set `security.enterprise_roots.enabled` = `true`, kemudian mulakan semula Firefox
+- Port 443 sibuk (Skype/VMware/IIS)? Tukar **Port HTTPS** dalam Tetapan. HTTP tetap jalan seperti biasa
+- Laravel di belakang HTTPS: set `APP_URL=https://projek.test` dalam `.env`
+- Fail `lokalkit-ca.key` ialah kunci rahsia CA. **Jangan kongsi** dengan sesiapa
 
 ## System tray
 
@@ -126,7 +142,7 @@ Struktur kod:
 ## Pelan seterusnya
 
 - [x] Ikon di system tray
-- [ ] SSL lokal (`https://projek.test`) dengan mkcert
+- [x] SSL lokal (`https://projek.test`)
 - [ ] Muat turun binary terus dari dalam app
 - [ ] Redis, PostgreSQL, Node.js
 - [ ] Installer (NSIS)

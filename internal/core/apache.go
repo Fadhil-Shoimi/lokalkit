@@ -13,8 +13,9 @@ import (
 )
 
 type Apache struct {
-	m    *Manager
-	proc *Proc
+	m     *Manager
+	proc  *Proc
+	sslOn bool // HTTPS active in the running Apache
 }
 
 func (a *Apache) ID() string { return "apache" }
@@ -29,11 +30,18 @@ func (a *Apache) Info() ServiceInfo {
 	return ServiceInfo{
 		ID: "apache", Name: "Apache", Installed: bin != "",
 		Version: probeVersion(bin, "-v"), Running: a.proc.Running(),
-		Ports: fmt.Sprint(cfg.ApachePort), Hint: `bin\apache\<versi>\bin\httpd.exe`,
+		Ports: a.ports(cfg), Hint: `bin\apache\<versi>\bin\httpd.exe`,
 	}
 }
 
 func (a *Apache) Running() bool { return a.proc.Running() }
+
+func (a *Apache) ports(cfg Config) string {
+	if cfg.SSL && (!a.proc.Running() || a.sslOn) {
+		return fmt.Sprintf("%d/%d", cfg.ApachePort, cfg.SSLPort)
+	}
+	return fmt.Sprint(cfg.ApachePort)
+}
 
 func (a *Apache) confPath() string { return filepath.Join(a.m.P.Etc, "apache", "httpd.conf") }
 
@@ -56,16 +64,32 @@ func (a *Apache) Start() error {
 		return err
 	}
 	cfg := a.m.config()
-	if !PortFree(cfg.ApachePort) {
+	if !waitPortFree(cfg.ApachePort, 8*time.Second) {
 		return fmt.Errorf("port %d sedang digunakan oleh program lain (Skype/IIS/Laragon lain?)", cfg.ApachePort)
 	}
-	if err := a.m.WriteVhosts(); err != nil {
+	apacheDir := filepath.Dir(filepath.Dir(bin))
+	var ssl *SSLFiles
+	if cfg.SSL {
+		if s, err := a.m.prepareSSL(apacheDir); err != nil {
+			a.m.Logf("error", "HTTPS dimatikan buat sementara: %v", err)
+		} else {
+			ssl = s
+		}
+	}
+	if err := a.m.WriteVhosts(ssl); err != nil {
 		return err
 	}
-	apacheDir := filepath.Dir(filepath.Dir(bin))
+	mods := availableModules(apacheDir)
+	if ssl != nil {
+		for _, m := range []string{"socache_shmcb", "ssl"} {
+			if exists(filepath.Join(apacheDir, "modules", "mod_"+m+".so")) {
+				mods = append(mods, m)
+			}
+		}
+	}
 	conf := BuildHttpdConf(HttpdParams{
 		ApacheDir: apacheDir, Paths: a.m.P, Port: cfg.ApachePort,
-		PHP: php, Modules: availableModules(apacheDir), Windows: runtime.GOOS == "windows",
+		PHP: php, Modules: mods, Windows: runtime.GOOS == "windows", SSL: ssl,
 	})
 	if err := os.WriteFile(a.confPath(), []byte(conf), 0o644); err != nil {
 		return err
@@ -82,7 +106,11 @@ func (a *Apache) Start() error {
 		return fmt.Errorf("config Apache ada ralat: %s", strings.TrimSpace(string(out)))
 	}
 
-	if err := a.proc.Start(bin, []string{"-f", a.confPath()}, apacheDir, env,
+	args := []string{"-f", a.confPath()}
+	if runtime.GOOS != "windows" {
+		args = append(args, "-DFOREGROUND") // Windows httpd never daemonizes; elsewhere ask it not to
+	}
+	if err := a.proc.Start(bin, args, apacheDir, env,
 		filepath.Join(a.m.P.Logs, "apache_console.log")); err != nil {
 		return err
 	}
@@ -90,6 +118,7 @@ func (a *Apache) Start() error {
 		_ = a.proc.Stop(nil, 0)
 		return fmt.Errorf("Apache gagal dimulakan (%v). Lihat logs\\apache_error.log", err)
 	}
+	a.sslOn = ssl != nil
 	return nil
 }
 
@@ -120,6 +149,7 @@ type HttpdParams struct {
 	PHP       PHPInstall
 	Modules   []string
 	Windows   bool
+	SSL       *SSLFiles // nil = no HTTPS
 }
 
 func BuildHttpdConf(p HttpdParams) string {
@@ -168,6 +198,15 @@ func BuildHttpdConf(p HttpdParams) string {
 	w(`PHPIniDir "%s"`, slash(p.PHP.Dir))
 	w("<FilesMatch \"\\.php$\">\n    SetHandler application/x-httpd-php\n</FilesMatch>")
 	w("")
+	if p.SSL != nil {
+		w("# HTTPS (sijil daripada CA LokalKit)")
+		w("Listen %d", p.SSL.Port)
+		w(`SSLSessionCache "shmcb:%s/ssl_scache(512000)"`, slash(p.Paths.Tmp))
+		w("SSLSessionCacheTimeout 300")
+		w("SSLProtocol all -SSLv3 -TLSv1 -TLSv1.1")
+		w("SSLHonorCipherOrder off")
+		w("")
+	}
 	w(`IncludeOptional "%s/apache/sites-enabled/*.conf"`, slash(p.Paths.Etc))
 	w(`IncludeOptional "%s/apache/custom.conf"`, slash(p.Paths.Etc))
 	return b.String()

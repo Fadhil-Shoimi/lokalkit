@@ -42,7 +42,7 @@ func (s *Mailpit) Start() error {
 	}
 	cfg := s.m.config()
 	for _, p := range []int{cfg.MailpitSMTPPort, cfg.MailpitHTTPPort} {
-		if !PortFree(p) {
+		if !waitPortFree(p, 8*time.Second) {
 			return fmt.Errorf("port %d sedang digunakan", p)
 		}
 	}

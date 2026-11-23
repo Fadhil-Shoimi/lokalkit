@@ -47,6 +47,8 @@ type Manager struct {
 	emit     Emitter
 	logMu    sync.Mutex
 	history  []LogEntry
+
+	trustAsked bool // asked Windows to trust the CA during this session
 }
 
 func NewManager(root string, emit Emitter) (*Manager, error) {
@@ -266,7 +268,7 @@ func (m *Manager) Toggle(id string) error {
 
 // Reload regenerates virtual hosts + hosts file and restarts Apache if running.
 func (m *Manager) Reload() error {
-	if err := m.WriteVhosts(); err != nil {
+	if err := m.WriteVhosts(nil); err != nil {
 		return err
 	}
 	if err := m.SyncHosts(); err != nil {

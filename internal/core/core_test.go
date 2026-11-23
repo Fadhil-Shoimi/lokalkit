@@ -1,6 +1,7 @@
 package core
 
 import (
+	"crypto/x509"
 	"net"
 	"os"
 	"os/exec"
@@ -187,5 +188,47 @@ func TestProcLifecycle(t *testing.T) {
 	}
 	if p.Running() || !<-exits {
 		t.Error("should be stopped with expected=true")
+	}
+}
+
+func TestCertificates(t *testing.T) {
+	dir := t.TempDir()
+	ca, key, created, err := EnsureCA(dir)
+	if err != nil || !created || !ca.IsCA {
+		t.Fatalf("create CA: %v %v", created, err)
+	}
+	ca2, _, created2, err := EnsureCA(dir)
+	if err != nil || created2 || !ca2.Equal(ca) {
+		t.Fatal("CA should be reused")
+	}
+	names := ServerNames([]string{"kedai.test", "blog.test"})
+	if names[0] != "localhost" || len(names) != 5 {
+		t.Fatalf("names %v", names)
+	}
+	if changed, err := EnsureServerCert(dir, ca, key, names); err != nil || !changed {
+		t.Fatalf("first cert: %v %v", changed, err)
+	}
+	if changed, _ := EnsureServerCert(dir, ca, key, names); changed {
+		t.Error("same names should not re-issue")
+	}
+	if changed, _ := EnsureServerCert(dir, ca, key, ServerNames([]string{"kedai.test"})); !changed {
+		t.Error("new names should re-issue")
+	}
+	leaf, err := readCert(filepath.Join(dir, srvFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pool := x509.NewCertPool()
+	pool.AddCert(ca)
+	for _, host := range []string{"kedai.test", "api.kedai.test", "localhost"} {
+		if _, err := leaf.Verify(x509.VerifyOptions{DNSName: host, Roots: pool}); err != nil {
+			t.Errorf("verify %s: %v", host, err)
+		}
+	}
+	if _, err := leaf.Verify(x509.VerifyOptions{DNSName: "blog.test", Roots: pool}); err == nil {
+		t.Error("blog.test should no longer be covered")
+	}
+	if leaf.NotAfter.Sub(leaf.NotBefore) > 398*24*time.Hour {
+		t.Error("leaf validity too long for browsers")
 	}
 }

@@ -140,6 +140,7 @@ type State struct {
 	Current  string             `json:"currentPhp"`
 	Projects []core.Project     `json:"projects"`
 	Logs     []core.LogEntry    `json:"logs"`
+	SSL      core.SSLStatus     `json:"ssl"`
 }
 
 func (a *App) GetState() State {
@@ -155,6 +156,7 @@ func (a *App) GetState() State {
 	}
 	s.Projects = a.m.Projects()
 	s.Logs = a.m.History()
+	s.SSL = a.m.SSLStatus()
 	return s
 }
 
@@ -215,6 +217,15 @@ func (a *App) SaveConfig(c core.Config) error {
 	return nil
 }
 
+// TrustCA asks Windows to trust the LokalKit certificate authority.
+func (a *App) TrustCA() (core.SSLStatus, error) {
+	if err := a.ready(); err != nil {
+		return core.SSLStatus{}, err
+	}
+	err := a.m.TrustCA()
+	return a.m.SSLStatus(), err
+}
+
 func (a *App) CreateProject(name, kind string) (core.Project, error) {
 	if err := a.ready(); err != nil {
 		return core.Project{}, err
@@ -263,7 +274,7 @@ func (a *App) OpenFolder(key string) error {
 		return err
 	}
 	p := a.m.P
-	paths := map[string]string{"root": p.Root, "www": p.WWW, "bin": p.Bin, "logs": p.Logs, "etc": p.Etc}
+	paths := map[string]string{"root": p.Root, "www": p.WWW, "bin": p.Bin, "logs": p.Logs, "etc": p.Etc, "ssl": a.m.SSLStatus().Dir}
 	if dir, ok := paths[key]; ok {
 		return core.OpenPath(dir)
 	}

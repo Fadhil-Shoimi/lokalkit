@@ -122,6 +122,20 @@ func PortFree(port int) bool {
 	return true
 }
 
+// waitPortFree waits for a port to be released (e.g. right after a restart).
+func waitPortFree(port int, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for {
+		if PortFree(port) {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
 var errExited = errors.New("proses berhenti semasa dimulakan")
 
 // waitPort waits until the port accepts connections, the process exits, or timeout.

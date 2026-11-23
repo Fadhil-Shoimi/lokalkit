@@ -78,6 +78,18 @@
           <label class="check"><input type="checkbox" name="autoVhost"/> Auto virtual host untuk setiap folder dalam www</label>
         </fieldset>
         <fieldset>
+          <legend>HTTPS (SSL)</legend>
+          <label class="check"><input type="checkbox" name="ssl"/> HTTPS untuk setiap projek (https://nama-projek.test)</label>
+          <label>Port HTTPS <input type="number" name="sslPort" min="1" max="65535"/></label>
+          <div class="ssl-status">
+            <span id="sslStatus" class="muted-text"></span>
+            <div class="ssl-btns">
+              <button type="button" class="btn small" id="btnTrust">Percayai sijil</button>
+              <button type="button" class="btn small ghost" data-folder="ssl">Folder sijil</button>
+            </div>
+          </div>
+        </fieldset>
+        <fieldset>
           <legend>Umum</legend>
           <label class="check"><input type="checkbox" name="startAllOnLaunch"/> Mula semua servis bila LokalKit dibuka</label>
           <label class="check"><input type="checkbox" name="minimizeToTray"/> Butang tutup (X) sembunyikan LokalKit ke system tray</label>

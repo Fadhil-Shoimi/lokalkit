@@ -18,7 +18,8 @@ type Project struct {
 	DocRoot string `json:"docRoot"`
 	Host    string `json:"host"`
 	URL     string `json:"url"`
-	Kind    string `json:"kind"` // laravel, wordpress, php
+	HTTPS   string `json:"https"` // https URL when HTTPS is enabled
+	Kind    string `json:"kind"`  // laravel, wordpress, php
 }
 
 var hostLabelRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
@@ -67,6 +68,12 @@ func ScanProjects(www string, cfg Config) []Project {
 		if cfg.ApachePort != 80 {
 			p.URL += fmt.Sprintf(":%d", cfg.ApachePort)
 		}
+		if cfg.SSL {
+			p.HTTPS = "https://" + p.Host
+			if cfg.SSLPort != 443 {
+				p.HTTPS += fmt.Sprintf(":%d", cfg.SSLPort)
+			}
+		}
 		out = append(out, p)
 	}
 	return out
@@ -88,8 +95,29 @@ func BuildVhost(p Project, port int) string {
 `, p.Name, port, p.Host, p.Host, dr, dr)
 }
 
+// BuildSSLVhost is the HTTPS twin of BuildVhost.
+func BuildSSLVhost(p Project, ssl SSLFiles) string {
+	dr := slash(p.DocRoot)
+	return fmt.Sprintf(`# Dijana oleh LokalKit untuk %s (HTTPS)
+<VirtualHost *:%d>
+    ServerName %s
+    ServerAlias *.%s
+    DocumentRoot "%s"
+    SSLEngine on
+    SSLCertificateFile "%s"
+    SSLCertificateKeyFile "%s"
+    <Directory "%s">
+        Options Indexes FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+</VirtualHost>
+`, p.Name, ssl.Port, p.Host, p.Host, dr, slash(ssl.Cert), slash(ssl.Key), dr)
+}
+
 // WriteVhosts regenerates etc/apache/sites-enabled/auto.*.conf.
-func (m *Manager) WriteVhosts() error {
+// ssl is nil when HTTPS is off (or unavailable this run).
+func (m *Manager) WriteVhosts(ssl *SSLFiles) error {
 	dir := filepath.Join(m.P.Etc, "apache", "sites-enabled")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
@@ -101,6 +129,10 @@ func (m *Manager) WriteVhosts() error {
 	cfg := m.config()
 	def := fmt.Sprintf("# Dijana oleh LokalKit\n<VirtualHost *:%d>\n    ServerName localhost\n    DocumentRoot \"%s\"\n</VirtualHost>\n",
 		cfg.ApachePort, slash(m.P.WWW))
+	if ssl != nil {
+		def += BuildSSLVhost(Project{Name: "localhost", Host: "localhost", DocRoot: m.P.WWW}, *ssl)
+		def = strings.Replace(def, "    ServerAlias *.localhost\n", "", 1)
+	}
 	if err := os.WriteFile(filepath.Join(dir, "auto.000-localhost.conf"), []byte(def), 0o644); err != nil {
 		return err
 	}
@@ -114,7 +146,11 @@ func (m *Manager) WriteVhosts() error {
 		return nil
 	}
 	for _, p := range m.Projects() {
-		if err := os.WriteFile(filepath.Join(dir, "auto."+p.Host+".conf"), []byte(BuildVhost(p, cfg.ApachePort)), 0o644); err != nil {
+		conf := BuildVhost(p, cfg.ApachePort)
+		if ssl != nil {
+			conf += "\n" + BuildSSLVhost(p, *ssl)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "auto."+p.Host+".conf"), []byte(conf), 0o644); err != nil {
 			return err
 		}
 	}
