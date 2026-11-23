@@ -287,12 +287,7 @@ func (m *Manager) SyncHosts() error {
 	helperLog := filepath.Join(m.P.Logs, "hosts-helper.log")
 	_ = os.Remove(helperLog)
 	exe, _ := os.Executable()
-	q := func(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
-	ps := fmt.Sprintf(`$p = Start-Process -FilePath %s -ArgumentList '--sync-hosts', %s -Verb RunAs -Wait -WindowStyle Hidden -PassThru; exit $p.ExitCode`,
-		q(exe), q(`"`+m.P.Root+`"`))
-	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", ps)
-	hideWindow(cmd)
-	out, runErr := cmd.CombinedOutput()
+	runErr := runElevated(exe, []string{"--sync-hosts", m.P.Root})
 	if still, _ := SyncHostsFile(m.hostNames()); !still {
 		flushDNS()
 		m.Logf("ok", "Hosts file updated")
@@ -300,10 +295,7 @@ func (m *Manager) SyncHosts() error {
 	}
 	detail := strings.TrimSpace(readSmall(helperLog))
 	if detail == "" && runErr != nil {
-		detail = lastLines(string(out), 2)
-		if strings.Contains(detail, "canceled") || strings.Contains(detail, "cancelled") {
-			detail = "the Windows admin prompt was declined"
-		}
+		detail = runErr.Error()
 	}
 	if detail == "" {
 		detail = "unknown reason"
