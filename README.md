@@ -14,6 +14,7 @@ A local PHP development environment for Windows. **Apache + PHP + MySQL + Mailpi
 - **Automatic HTTPS**: every project also gets `https://folder.test` (and `https://*.folder.test`), signed by LokalKit's own local CA. No mkcert needed
 - `public\` folders are detected automatically (Laravel, Symfony)
 - Switch PHP versions. `php.ini` is generated for you with the common extensions enabled
+- **PHP updates**: a **↑ 8.x.y** button appears next to the PHP menu when windows.php.net has a newer build of your PHP; other PHP branches (e.g. 8.4, 8.5) can be downloaded from the menu. Your `php.ini` is carried over, Apache restarts, and the previous PHP stays installed so you can switch back
 - MySQL is initialized on first start (`root`, no password)
 - PHP `mail()` goes straight to Mailpit
 - Quick buttons: Web, Database (opens DBeaver with a ready "LokalKit MySQL" connection, else HeidiSQL or Adminer), Terminal (PHP, Composer and MySQL on PATH), www folder

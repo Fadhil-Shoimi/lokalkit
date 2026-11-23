@@ -98,9 +98,50 @@ function renderPHP() {
     sel.disabled = true;
     return;
   }
-  sel.disabled = false;
-  sel.innerHTML = state.php.map((p) =>
+  sel.disabled = phpInstalling;
+  const installed = state.php.map((p) =>
     `<option value="${esc(p.name)}" ${p.name === state.currentPhp ? 'selected' : ''}>${esc(p.version)}${p.ts ? '' : ' (NTS)'}</option>`).join('');
+  // Branches you don't have yet, offered for download.
+  const have = new Set(state.php.map((p) => branchOf(p.version)));
+  const extra = (phpUpdates.releases || []).filter((r) => !have.has(r.branch));
+  sel.innerHTML = installed + (extra.length
+    ? `<optgroup label="Download">${extra.map((r) => `<option value="dl:${esc(r.branch)}">PHP ${esc(r.version)} ↓</option>`).join('')}</optgroup>`
+    : '');
+  const up = $('#phpUpdate');
+  up.hidden = !phpUpdates.update && !phpInstalling;
+  up.disabled = phpInstalling;
+  if (!phpInstalling && phpUpdates.update) up.textContent = `↑ ${phpUpdates.update.version}`;
+}
+
+let phpUpdates = {};
+let phpInstalling = false;
+const branchOf = (v) => String(v).split('.').slice(0, 2).join('.');
+
+async function checkPHPUpdates(force = false) {
+  try { phpUpdates = (await api.GetPHPUpdates(force)) || {}; } catch (e) { phpUpdates = {}; }
+  renderPHP();
+}
+
+async function installPHP(branch, label) {
+  if (!confirm(`Download ${label} and switch to it?\n\nYour php.ini settings are copied over and Apache restarts. The current PHP stays installed, so you can switch back from this menu.`)) {
+    renderPHP();
+    return;
+  }
+  phpInstalling = true;
+  $('#phpUpdate').hidden = false;
+  $('#phpUpdate').textContent = `Downloading PHP ${branch}…`;
+  renderPHP();
+  try {
+    await api.InstallPHP(branch);
+    toast(`Now using ${label}`);
+  } catch (e) {
+    toast(String(e), true);
+  } finally {
+    phpInstalling = false;
+    const s = await api.GetState();
+    state.php = s.php; state.currentPhp = s.currentPhp; state.config = s.config;
+    await checkPHPUpdates(true);
+  }
 }
 
 function addLog(e) {
@@ -207,6 +248,7 @@ async function refresh() {
   renderProjects(state.projects);
   renderPHP();
   renderSettings();
+  checkPHPUpdates();
   loadComponents().then(() => {
     // First run with nothing installed: open the Install tab.
     if (!state.services.some((x) => x.installed)) showTab('install');
@@ -292,7 +334,16 @@ $('#npName').addEventListener('input', (e) => {
   e.target.value = e.target.value.toLowerCase().replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '');
 });
 
+$('#phpUpdate').addEventListener('click', () => {
+  if (phpUpdates.update) installPHP(phpUpdates.update.branch, `PHP ${phpUpdates.update.version}`);
+});
+
 $('#phpSelect').addEventListener('change', async (e) => {
+  if (e.target.value.startsWith('dl:')) {
+    const branch = e.target.value.slice(3);
+    const r = (phpUpdates.releases || []).find((x) => x.branch === branch);
+    return installPHP(branch, `PHP ${r ? r.version : branch}`);
+  }
   const cfg = { ...state.config, phpVersion: e.target.value };
   const ok = await run(async () => { await api.SaveConfig(cfg); return true; });
   if (ok) { state.config = cfg; toast('PHP version changed'); } else renderPHP();
@@ -412,7 +463,14 @@ $('#btnImportDb').addEventListener('click', async (ev) => {
 
 on('projects', () => refreshProjects());
 
-on('install-progress', (p) => { progress[p.id] = p; renderComponents(); });
+on('install-progress', (p) => {
+  progress[p.id] = p;
+  renderComponents();
+  if (phpInstalling && p.id === 'php') {
+    const pct = p.phase === 'downloading' && p.total > 0 ? ` ${Math.round((p.received / p.total) * 100)}%` : '';
+    $('#phpUpdate').textContent = { downloading: `Downloading${pct}…`, verifying: 'Verifying…', extracting: 'Installing…', done: 'Switching…' }[p.phase] || $('#phpUpdate').textContent;
+  }
+});
 
 on('services', (s) => { renderServices(s); renderProjects(state.projects || []); });
 on('log', addLog);

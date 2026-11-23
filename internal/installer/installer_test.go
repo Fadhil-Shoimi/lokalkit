@@ -37,6 +37,7 @@ func sum(b []byte) string { h := sha256.Sum256(b); return hex.EncodeToString(h[:
 // fakeSites serves look-alikes of windows.php.net, Apache Lounge, MySQL,
 // GitHub (Mailpit), getcomposer.org and adminer.org.
 func fakeSites(t *testing.T) (*httptest.Server, Sources) {
+	php84Zip := makeZip(t, map[string]string{"php.exe": "php84", "php8apache2_4.dll": "dll"})
 	phpZip := makeZip(t, map[string]string{"php.exe": "php", "php8apache2_4.dll": "dll", "php.ini-development": ";ini"})
 	apacheZip := makeZip(t, map[string]string{"Apache24/bin/httpd.exe": "httpd", "ReadMe.txt": "hi"})
 	mysqlZip := makeZip(t, map[string]string{"mysql-8.4.3-winx64/bin/mysqld.exe": "mysqld"})
@@ -49,8 +50,11 @@ func fakeSites(t *testing.T) (*httptest.Server, Sources) {
 			"nts-vs16-x64":{"zip":{"path":"php-8.3.99-nts-Win32-vs16-x64.zip","sha256":"00"}},
 			"ts-vs16-x86":{"zip":{"path":"php-8.3.99-Win32-vs16-x86.zip","sha256":"00"}},
 			"ts-vs16-x64":{"zip":{"path":"php-8.3.99-Win32-vs16-x64.zip","sha256":"%s"}}},
-			"8.2":{"version":"8.2.1"}}`, sum(phpZip))
+			"8.4":{"version":"8.4.15",
+			"ts-vs17-x64":{"zip":{"path":"php-8.4.15-Win32-vs17-x64.zip","sha256":"%s"}}},
+			"8.2":{"version":"8.2.1"}}`, sum(phpZip), sum(php84Zip))
 	})
+	mux.HandleFunc("/php/php-8.4.15-Win32-vs17-x64.zip", func(w http.ResponseWriter, r *http.Request) { w.Write(php84Zip) })
 	mux.HandleFunc("/php/php-8.3.99-Win32-vs16-x64.zip", func(w http.ResponseWriter, r *http.Request) { w.Write(phpZip) })
 	mux.HandleFunc("/apache/download/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, `<a href="/download/VS17/binaries/httpd-2.4.9-240101-win64-VS17.zip">old</a>
@@ -248,5 +252,28 @@ func TestDBeaverDetected(t *testing.T) {
 	os.WriteFile(filepath.Join(root, "bin", "dbeaver", "dbeaver-26.2.5", "dbeaver", exe), nil, 0o644)
 	if ok, v := appInstalled(root, "dbeaver", "dbeaver", "dbeaver-"); !ok || v != "26.2.5" {
 		t.Fatalf("got %v %q", ok, v)
+	}
+}
+
+func TestPHPReleasesAndBranchInstall(t *testing.T) {
+	_, s := fakeSites(t)
+	in := New(t.TempDir(), nil, nil)
+	in.sources = &s
+	rel, err := in.PHPReleases(context.Background())
+	if err != nil || len(rel) != 2 || rel[0].Branch != "8.4" || rel[0].Version != "8.4.15" || rel[1].Version != "8.3.99" {
+		t.Fatalf("releases: %+v %v", rel, err)
+	}
+	name, err := in.InstallPHP("8.4")
+	if err != nil || name != "php-8.4.15-Win32-vs17-x64" {
+		t.Fatalf("install: %q %v", name, err)
+	}
+	if !fileExists(filepath.Join(in.Root, "bin", "php", name, "php.exe")) {
+		t.Fatal("PHP 8.4 not installed")
+	}
+	if in.phpBranch != "" {
+		t.Error("branch override should be cleared")
+	}
+	if CompareVersions("8.3.10", "8.3.9") != 1 || CompareVersions("8.3.9", "8.3.9") != 0 || CompareVersions("8.3", "8.4.0") != -1 {
+		t.Error("CompareVersions")
 	}
 }

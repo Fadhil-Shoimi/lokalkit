@@ -380,3 +380,15 @@ func serviceSettingsChanged(a, b Config) bool {
 	a.Linked, b.Linked = nil, nil
 	return !reflect.DeepEqual(a, b)
 }
+
+// Restart restarts one service if it is running.
+func (m *Manager) Restart(id string) error {
+	s, err := m.service(id)
+	if err != nil || !s.Running() {
+		return err
+	}
+	if err := m.Stop(id); err != nil {
+		return err
+	}
+	return m.Start(id)
+}

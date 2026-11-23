@@ -371,3 +371,21 @@ func TestDBeaverArgs(t *testing.T) {
 		t.Errorf("%q", args)
 	}
 }
+
+func TestAdoptPHPIni(t *testing.T) {
+	m := newTestManager(t)
+	for _, v := range []string{"php-8.3.37", "php-8.3.38"} {
+		d := filepath.Join(m.P.Bin, "php", v)
+		os.MkdirAll(d, 0o755)
+		os.WriteFile(filepath.Join(d, exeName("php")), nil, 0o755)
+	}
+	old := filepath.Join(m.P.Bin, "php", "php-8.3.37")
+	os.WriteFile(filepath.Join(old, "php.ini"), []byte("extension_dir = \""+slash(filepath.Join(old, "ext"))+"\"\nmemory_limit = 2G\n"), 0o644)
+	if err := m.AdoptPHPIni("php-8.3.37", "php-8.3.38"); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(filepath.Join(m.P.Bin, "php", "php-8.3.38", "php.ini"))
+	if !strings.Contains(string(b), "memory_limit = 2G") || !strings.Contains(string(b), "php-8.3.38/ext") {
+		t.Errorf("new php.ini: %s", b)
+	}
+}

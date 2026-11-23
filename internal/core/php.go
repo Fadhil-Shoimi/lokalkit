@@ -165,3 +165,34 @@ func FixExtensionDir(ini, want string) (string, bool) {
 	}
 	return ini[:loc[0]] + `extension_dir = "` + want + `"` + ini[end:], true
 }
+
+// AdoptPHPIni copies php.ini from one installed PHP to another (when the
+// new one has none), so your settings follow a PHP update. extension_dir is
+// corrected for the new folder.
+func (m *Manager) AdoptPHPIni(fromName, toName string) error {
+	var from, to PHPInstall
+	for _, p := range m.PHPInstalls() {
+		if p.Name == fromName {
+			from = p
+		}
+		if p.Name == toName {
+			to = p
+		}
+	}
+	if to.Dir == "" {
+		return fmt.Errorf("PHP %s not found", toName)
+	}
+	dst := filepath.Join(to.Dir, "php.ini")
+	if exists(dst) || from.Dir == "" {
+		return m.EnsurePHPIni(to)
+	}
+	b, err := os.ReadFile(filepath.Join(from.Dir, "php.ini"))
+	if err != nil {
+		return m.EnsurePHPIni(to)
+	}
+	if err := os.WriteFile(dst, b, 0o644); err != nil {
+		return err
+	}
+	m.Logf("info", "Copied your php.ini settings from PHP %s to PHP %s", from.Version, to.Version)
+	return m.EnsurePHPIni(to) // fixes extension_dir
+}

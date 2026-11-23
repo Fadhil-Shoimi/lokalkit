@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
+	"sync"
+	"time"
 
 	"lokalkit/internal/core"
 	"lokalkit/internal/installer"
@@ -23,8 +26,12 @@ type App struct {
 	tray      *tray.Tray
 	inst      *installer.Installer
 	stopWatch chan struct{}
-	quitting  bool // true when quitting for real (tray "Quit"), not hiding
-	hidTold   bool // already told the user the app keeps running in the tray
+
+	phpMu      sync.Mutex
+	phpChecked time.Time
+	phpCache   []installer.PHPRelease
+	quitting   bool // true when quitting for real (tray "Quit"), not hiding
+	hidTold    bool // already told the user the app keeps running in the tray
 }
 
 func NewApp() *App { return &App{} }
@@ -181,6 +188,81 @@ func (a *App) InstallComponents(ids []string) error {
 	}
 	runtime.EventsEmit(a.ctx, "services", a.m.Services())
 	return err
+}
+
+// PHPUpdates says which PHP versions can be downloaded and whether a newer
+// patch exists for the PHP currently in use.
+type PHPUpdates struct {
+	Releases []installer.PHPRelease `json:"releases"`
+	Update   *installer.PHPRelease  `json:"update"` // newer build of the current branch
+	Error    string                 `json:"error"`
+}
+
+func branchOf(v string) string {
+	parts := strings.Split(v, ".")
+	if len(parts) < 2 {
+		return v
+	}
+	return parts[0] + "." + parts[1]
+}
+
+// GetPHPUpdates checks windows.php.net (cached for 6 hours unless force).
+func (a *App) GetPHPUpdates(force bool) PHPUpdates {
+	if a.inst == nil || a.m == nil {
+		return PHPUpdates{}
+	}
+	a.phpMu.Lock()
+	defer a.phpMu.Unlock()
+	if force || a.phpCache == nil || time.Since(a.phpChecked) > 6*time.Hour {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		rel, err := a.inst.PHPReleases(ctx)
+		if err != nil {
+			return PHPUpdates{Error: err.Error()}
+		}
+		a.phpCache, a.phpChecked = rel, time.Now()
+	}
+	out := PHPUpdates{Releases: a.phpCache}
+	if cur, ok := a.m.CurrentPHP(); ok {
+		for i, r := range a.phpCache {
+			if r.Branch == branchOf(cur.Version) && installer.CompareVersions(r.Version, cur.Version) > 0 {
+				out.Update = &a.phpCache[i]
+			}
+		}
+	}
+	return out
+}
+
+// InstallPHP downloads the newest build of a PHP branch, carries your
+// php.ini over, switches to it and restarts Apache. The old PHP is kept.
+func (a *App) InstallPHP(branch string) error {
+	if err := a.ready(); err != nil {
+		return err
+	}
+	prev, _ := a.m.CurrentPHP()
+	a.m.Logf("info", "Downloading PHP %s...", branch)
+	name, err := a.inst.InstallPHP(branch)
+	if err != nil {
+		a.m.Logf("error", "PHP download failed: %v", err)
+		return err
+	}
+	if err := a.m.AdoptPHPIni(prev.Name, name); err != nil {
+		a.m.Logf("error", "php.ini: %v", err)
+	}
+	cfg := a.m.Config()
+	cfg.PHPVersion = name
+	if _, err := a.m.SaveConfig(cfg); err != nil {
+		return err
+	}
+	cur, _ := a.m.CurrentPHP()
+	a.m.Logf("ok", "Now using PHP %s (PHP %s is still installed if you want to switch back)", cur.Version, prev.Version)
+	if err := a.m.Restart("apache"); err != nil {
+		return err
+	}
+	a.phpMu.Lock()
+	a.phpChecked = time.Time{} // re-evaluate the update badge
+	a.phpMu.Unlock()
+	return nil
 }
 
 func (a *App) CancelInstall() {

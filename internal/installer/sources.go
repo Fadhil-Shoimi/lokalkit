@@ -153,9 +153,13 @@ func ResolvePHP(ctx context.Context, s Sources) (Artifact, error) {
 	if err := json.Unmarshal(b, &rel); err != nil {
 		return Artifact{}, fmt.Errorf("unexpected PHP releases format: %w", err)
 	}
-	branch, ok := rel[s.PHPBranch]
+	return parsePHPBranch(rel, s.PHPBranch, s.PHPDownloadBase)
+}
+
+func parsePHPBranch(rel map[string]map[string]json.RawMessage, branchName, base string) (Artifact, error) {
+	branch, ok := rel[branchName]
 	if !ok {
-		return Artifact{}, fmt.Errorf("PHP %s not found in releases", s.PHPBranch)
+		return Artifact{}, fmt.Errorf("PHP %s not found in releases", branchName)
 	}
 	var version string
 	_ = json.Unmarshal(branch["version"], &version)
@@ -166,7 +170,7 @@ func ResolvePHP(ctx context.Context, s Sources) (Artifact, error) {
 		}
 	}
 	if len(keys) == 0 {
-		return Artifact{}, fmt.Errorf("no Thread Safe x64 build for PHP %s", s.PHPBranch)
+		return Artifact{}, fmt.Errorf("no Thread Safe x64 build for PHP %s", branchName)
 	}
 	sort.Strings(keys)
 	var build struct {
@@ -181,7 +185,7 @@ func ResolvePHP(ctx context.Context, s Sources) (Artifact, error) {
 	name := strings.TrimSuffix(build.Zip.Path, ".zip")
 	return Artifact{
 		Version: version, Kind: "zip", Name: name,
-		URLs:   []string{s.PHPDownloadBase + build.Zip.Path},
+		URLs:   []string{base + build.Zip.Path},
 		SHA256: strings.ToLower(build.Zip.SHA256),
 	}, nil
 }
@@ -317,4 +321,55 @@ func ResolveDBeaver(ctx context.Context, s Sources) (Artifact, error) {
 		}
 	}
 	return art, nil
+}
+
+// PHPRelease is the newest Thread Safe x64 build of one PHP branch.
+type PHPRelease struct {
+	Branch  string `json:"branch"`  // "8.4"
+	Version string `json:"version"` // "8.4.15"
+	Name    string `json:"name"`    // folder name it installs as
+}
+
+// AvailablePHP lists every branch windows.php.net currently offers with a
+// Thread Safe x64 build, newest branch first.
+func AvailablePHP(ctx context.Context, s Sources) ([]PHPRelease, error) {
+	b, err := get(ctx, s.PHPReleasesJSON)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read PHP releases: %w", err)
+	}
+	var rel map[string]map[string]json.RawMessage
+	if err := json.Unmarshal(b, &rel); err != nil {
+		return nil, fmt.Errorf("unexpected PHP releases format: %w", err)
+	}
+	var out []PHPRelease
+	for branch := range rel {
+		art, err := parsePHPBranch(rel, branch, s.PHPDownloadBase)
+		if err != nil {
+			continue
+		}
+		out = append(out, PHPRelease{Branch: branch, Version: art.Version, Name: art.Name})
+	}
+	sort.Slice(out, func(i, j int) bool { return CompareVersions(out[i].Version, out[j].Version) > 0 })
+	return out, nil
+}
+
+// CompareVersions compares dotted versions numerically (-1, 0, 1).
+func CompareVersions(a, b string) int {
+	pa, pb := strings.Split(a, "."), strings.Split(b, ".")
+	for i := 0; i < len(pa) || i < len(pb); i++ {
+		var x, y int
+		if i < len(pa) {
+			x, _ = strconv.Atoi(strings.TrimLeft(pa[i], "v"))
+		}
+		if i < len(pb) {
+			y, _ = strconv.Atoi(strings.TrimLeft(pb[i], "v"))
+		}
+		if x != y {
+			if x < y {
+				return -1
+			}
+			return 1
+		}
+	}
+	return 0
 }

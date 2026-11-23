@@ -52,6 +52,8 @@ type Installer struct {
 	running bool
 	cancel  context.CancelFunc
 	sources *Sources
+	// phpBranch, when set, overrides Sources.PHPBranch for one PHP install.
+	phpBranch string
 
 	// resolvers can be replaced in tests.
 	resolvers map[string]func(context.Context, Sources) (Artifact, error)
@@ -210,7 +212,11 @@ func (in *Installer) installOne(ctx context.Context, id string) error {
 		return fmt.Errorf("unknown component")
 	}
 	in.emit(Progress{ID: id, Phase: "resolving", Message: "Finding the latest version..."})
-	art, err := resolve(ctx, *in.sources)
+	src := *in.sources
+	if id == "php" && in.phpBranch != "" {
+		src.PHPBranch = in.phpBranch
+	}
+	art, err := resolve(ctx, src)
 	if err != nil {
 		return err
 	}
@@ -536,4 +542,43 @@ func appInstalled(root, dir, exe, prefix string) (bool, string) {
 		v = ""
 	}
 	return true, v
+}
+
+// sourcesNow returns the (cached) download sources.
+func (in *Installer) sourcesNow(ctx context.Context) Sources {
+	in.mu.Lock()
+	defer in.mu.Unlock()
+	if in.sources == nil {
+		s := LoadSources(ctx, in.ManifestURL)
+		in.sources = &s
+	}
+	return *in.sources
+}
+
+// PHPReleases lists the PHP branches available for download.
+func (in *Installer) PHPReleases(ctx context.Context) ([]PHPRelease, error) {
+	return AvailablePHP(ctx, in.sourcesNow(ctx))
+}
+
+// InstallPHP downloads the newest Thread Safe build of a PHP branch and
+// returns the folder name it was installed as.
+func (in *Installer) InstallPHP(branch string) (string, error) {
+	src := in.sourcesNow(context.Background())
+	src.PHPBranch = branch
+	art, err := ResolvePHP(context.Background(), src)
+	if err != nil {
+		return "", err
+	}
+	in.mu.Lock()
+	in.phpBranch = branch
+	in.mu.Unlock()
+	defer func() {
+		in.mu.Lock()
+		in.phpBranch = ""
+		in.mu.Unlock()
+	}()
+	if err := in.Install([]string{"php"}); err != nil {
+		return "", err
+	}
+	return safeName(art.Name), nil
 }
