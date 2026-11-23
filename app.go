@@ -22,6 +22,7 @@ type App struct {
 	initErr  string
 	tray     *tray.Tray
 	inst     *installer.Installer
+	stopWatch chan struct{}
 	quitting bool // true when quitting for real (tray "Quit"), not hiding
 	hidTold  bool // already told the user the app keeps running in the tray
 }
@@ -47,6 +48,8 @@ func (a *App) startup(ctx context.Context) {
 	a.inst = installer.New(m.P.Root, a.detectComponent, func(p installer.Progress) {
 		runtime.EventsEmit(ctx, "install-progress", p)
 	})
+	a.stopWatch = make(chan struct{})
+	go m.WatchProjects(a.stopWatch)
 	m.Logf("info", "LokalKit %s ready. Folder: %s", AppVersion, m.P.Root)
 	if m.Config().StartAllOnLaunch {
 		go m.StartAll()
@@ -94,6 +97,9 @@ func (a *App) QuitApp() {
 }
 
 func (a *App) shutdown(ctx context.Context) {
+	if a.stopWatch != nil {
+		close(a.stopWatch)
+	}
 	if a.m != nil && a.m.Config().StopAllOnExit {
 		_ = a.m.StopAll()
 	}
@@ -193,6 +199,7 @@ type State struct {
 	Projects []core.Project     `json:"projects"`
 	Logs     []core.LogEntry    `json:"logs"`
 	SSL      core.SSLStatus     `json:"ssl"`
+	Missing  []string           `json:"missingHosts"` // project hosts not in the hosts file
 }
 
 func (a *App) GetState() State {
@@ -209,6 +216,7 @@ func (a *App) GetState() State {
 	s.Projects = a.m.Projects()
 	s.Logs = a.m.History()
 	s.SSL = a.m.SSLStatus()
+	s.Missing = a.m.MissingFromHosts()
 	return s
 }
 
@@ -267,6 +275,15 @@ func (a *App) SaveConfig(c core.Config) error {
 		return a.m.RestartRunning()
 	}
 	return nil
+}
+
+// FixHosts adds every project to the Windows hosts file (asks for admin).
+func (a *App) FixHosts() ([]string, error) {
+	if err := a.ready(); err != nil {
+		return nil, err
+	}
+	err := a.m.SyncHosts()
+	return a.m.MissingFromHosts(), err
 }
 
 // TrustCA asks Windows to trust the LokalKit certificate authority.

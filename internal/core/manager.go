@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -49,6 +50,9 @@ type Manager struct {
 	history  []LogEntry
 
 	trustAsked bool // asked Windows to trust the CA during this session
+
+	watchMu sync.Mutex
+	projSig string // last seen projects signature (see WatchProjects)
 }
 
 func NewManager(root string, emit Emitter) (*Manager, error) {
@@ -174,7 +178,11 @@ func (m *Manager) anyRunning() bool {
 	return false
 }
 
-func (m *Manager) Start(id string) error {
+func (m *Manager) Start(id string) error { return m.start(id, true) }
+
+// start starts a service; syncHosts=false when the caller just synced the
+// hosts file (avoids a second Windows admin prompt).
+func (m *Manager) start(id string, syncHosts bool) error {
 	s, err := m.service(id)
 	if err != nil {
 		return err
@@ -188,7 +196,7 @@ func (m *Manager) Start(id string) error {
 	}
 	defer m.setBusy(id, false)
 
-	if id == "apache" {
+	if id == "apache" && syncHosts {
 		if err := m.SyncHosts(); err != nil {
 			m.Logf("error", "%v", err)
 		}
@@ -281,20 +289,69 @@ func (m *Manager) Toggle(id string) error {
 
 // Reload regenerates virtual hosts + hosts file and restarts Apache if running.
 func (m *Manager) Reload() error {
+	m.rememberProjects()
 	if err := m.WriteVhosts(nil); err != nil {
 		return err
 	}
-	if err := m.SyncHosts(); err != nil {
-		m.Logf("error", "%v", err)
+	hostsErr := m.SyncHosts()
+	if hostsErr != nil {
+		m.Logf("error", "%v", hostsErr)
 	}
 	if s, _ := m.service("apache"); s.Running() {
 		if err := m.Stop("apache"); err != nil {
 			return err
 		}
-		return m.Start("apache")
+		if err := m.start("apache", false); err != nil {
+			return err
+		}
+	} else {
+		m.Logf("ok", "Virtual hosts updated")
 	}
-	m.Logf("ok", "Virtual hosts updated")
-	return nil
+	m.emit("projects", m.Projects())
+	return hostsErr
+}
+
+// projectsSignature changes whenever a project is added, removed or its
+// document root changes (e.g. Laravel's public/ appears).
+func (m *Manager) projectsSignature() string {
+	var b strings.Builder
+	for _, p := range m.Projects() {
+		b.WriteString(p.Host + "=" + p.DocRoot + "\n")
+	}
+	return b.String()
+}
+
+func (m *Manager) rememberProjects() {
+	sig := m.projectsSignature()
+	m.watchMu.Lock()
+	m.projSig = sig
+	m.watchMu.Unlock()
+}
+
+// WatchProjects polls the www folder and reloads automatically when
+// projects change, so a new folder works at https://name.test right away.
+func (m *Manager) WatchProjects(stop <-chan struct{}) {
+	m.rememberProjects()
+	t := time.NewTicker(3 * time.Second)
+	defer t.Stop()
+	for {
+		select {
+		case <-stop:
+			return
+		case <-t.C:
+		}
+		sig := m.projectsSignature()
+		m.watchMu.Lock()
+		changed := sig != m.projSig
+		m.watchMu.Unlock()
+		if !changed {
+			continue
+		}
+		m.Logf("info", "Projects changed in www, updating...")
+		if err := m.Reload(); err != nil {
+			m.Logf("error", "%v", err)
+		}
+	}
 }
 
 // RestartRunning restarts services that are running (after settings change).

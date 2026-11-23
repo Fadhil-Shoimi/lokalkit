@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"time"
 )
 
 // toolDirs are the folders added to PATH in LokalKit terminals.
@@ -162,7 +161,7 @@ func (m *Manager) CreateProject(name, kind string) (Project, error) {
 				m.Logf("ok", "Database %s created", filepathSafeDB(name))
 			}
 		}
-		go m.reloadWhenReady(filepath.Join(dir, "public", "index.php"))
+		// The www watcher reloads again once Laravel's public/ folder appears.
 	default:
 		page := fmt.Sprintf("<?php\n// Project %s, created by LokalKit\n?>\n<!doctype html>\n<html><head><meta charset=\"utf-8\"><title>%s</title></head>\n<body style=\"font-family:system-ui;padding:40px\">\n<h1>%s</h1>\n<p>PHP <?= PHP_VERSION ?> is running. Edit this file at <code><?= __FILE__ ?></code></p>\n</body></html>\n", name, name, name)
 		if err := os.WriteFile(filepath.Join(dir, "index.php"), []byte(page), 0o644); err != nil {
@@ -190,18 +189,4 @@ func filepathSafeDB(name string) string {
 		out = append(out, r)
 	}
 	return string(out)
-}
-
-// reloadWhenReady waits (up to 15 min) for a file, e.g. Laravel's
-// public/index.php, then reloads so the vhost points to /public.
-func (m *Manager) reloadWhenReady(file string) {
-	deadline := time.Now().Add(15 * time.Minute)
-	for time.Now().Before(deadline) {
-		if exists(file) {
-			time.Sleep(2 * time.Second)
-			_ = m.Reload()
-			return
-		}
-		time.Sleep(3 * time.Second)
-	}
 }

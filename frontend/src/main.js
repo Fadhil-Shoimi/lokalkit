@@ -77,6 +77,7 @@ function renderProjects(projects) {
                <a class="proj-url alt" data-url="${esc(p.url)}">http</a>`
             : `<a class="proj-url" data-url="${esc(p.url)}" title="${apacheUp ? 'Open in browser' : 'Start Apache first'}">${esc(p.url)}</a>`}
         </div>
+        ${(state.missingHosts || []).includes(p.host) ? `<div class="proj-warn">⚠ Not in the Windows hosts file yet, so browsers can't find it. <button class="linkish" data-fixhosts="1">Fix now</button></div>` : ''}
       </div>
       <div class="proj-btns">
         <button class="btn small" data-folder="${esc(p.name)}">Folder</button>
@@ -221,6 +222,12 @@ document.addEventListener('click', (ev) => {
     run(() => (svc.running ? api.StopService(svc.id) : api.StartService(svc.id)));
   } else if (t.id === 'btnAll') {
     run(() => (t.dataset.mode === 'stop' ? api.StopAll() : api.StartAll()));
+  } else if (t.dataset.fixhosts) {
+    run(async () => {
+      state.missingHosts = await api.FixHosts();
+      renderProjects(state.projects);
+      if (!state.missingHosts.length) toast('Hosts file updated. Reload the page in your browser.');
+    }, t);
   } else if (t.dataset.folder) {
     run(() => api.OpenFolder(t.dataset.folder));
   } else if (t.dataset.term) {
@@ -247,6 +254,7 @@ document.addEventListener('click', (ev) => {
 async function refreshProjects() {
   const s = await api.GetState();
   state.projects = s.projects;
+  state.missingHosts = s.missingHosts;
   renderProjects(s.projects);
 }
 
@@ -320,6 +328,8 @@ $('#btnInstall').addEventListener('click', async () => {
 });
 
 $('#btnCancelInstall').addEventListener('click', () => api.CancelInstall());
+
+on('projects', () => refreshProjects());
 
 on('install-progress', (p) => { progress[p.id] = p; renderComponents(); });
 

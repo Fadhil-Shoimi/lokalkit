@@ -242,3 +242,76 @@ func TestStartAllNothingInstalled(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 }
+
+func TestHostsSyncFlow(t *testing.T) {
+	root := t.TempDir()
+	hosts := filepath.Join(t.TempDir(), "hosts")
+	os.WriteFile(hosts, []byte("127.0.0.1 localhost\r\n"), 0o444) // read-only, like some "protected" hosts files
+	hostsPathOverride = hosts
+	t.Cleanup(func() { hostsPathOverride = "" })
+
+	m, err := NewManager(root, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.MkdirAll(filepath.Join(m.P.WWW, "lokalkitcodes", "public"), 0o755)
+	if got := m.MissingFromHosts(); len(got) != 1 || got[0] != "lokalkitcodes.test" {
+		t.Fatalf("missing before sync: %v", got)
+	}
+	if err := m.SyncHosts(); err != nil {
+		t.Fatal(err)
+	}
+	if got := m.MissingFromHosts(); len(got) != 0 {
+		t.Fatalf("still missing: %v", got)
+	}
+	b, _ := os.ReadFile(hosts)
+	if !strings.Contains(string(b), "127.0.0.1 lokalkitcodes.test\r\n") || !strings.HasPrefix(string(b), "127.0.0.1 localhost") {
+		t.Errorf("hosts content:\n%q", b)
+	}
+
+	// The elevated helper computes the same list from the folder on its own.
+	os.MkdirAll(filepath.Join(m.P.WWW, "blog"), 0o755)
+	if err := RunElevatedHostsSync(root); err != nil {
+		t.Fatal(err)
+	}
+	if got := m.MissingFromHosts(); len(got) != 0 {
+		t.Fatalf("helper did not add: %v", got)
+	}
+	// Helper errors are written for the main app to show.
+	if err := RunElevatedHostsSync(filepath.Join(root, "missing-root")); err == nil {
+		os.Remove(filepath.Join(root, "missing-root", "logs", "hosts-helper.log"))
+	}
+}
+
+func TestWatchProjectsReloads(t *testing.T) {
+	root := t.TempDir()
+	hostsPathOverride = filepath.Join(t.TempDir(), "hosts")
+	t.Cleanup(func() { hostsPathOverride = "" })
+	events := make(chan string, 20)
+	m, err := NewManager(root, func(ev string, _ any) { events <- ev })
+	if err != nil {
+		t.Fatal(err)
+	}
+	stop := make(chan struct{})
+	defer close(stop)
+	go m.WatchProjects(stop)
+	time.Sleep(100 * time.Millisecond)
+	os.MkdirAll(filepath.Join(m.P.WWW, "newapp"), 0o755)
+	deadline := time.After(8 * time.Second)
+	for {
+		select {
+		case ev := <-events:
+			if ev == "projects" {
+				if got := m.MissingFromHosts(); len(got) != 0 {
+					t.Fatalf("watcher did not sync hosts: %v", got)
+				}
+				if !exists(filepath.Join(m.P.Etc, "apache", "sites-enabled", "auto.newapp.test.conf")) {
+					t.Fatal("watcher did not write the vhost")
+				}
+				return
+			}
+		case <-deadline:
+			t.Fatal("watcher did not notice the new project")
+		}
+	}
+}

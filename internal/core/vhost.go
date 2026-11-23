@@ -162,7 +162,13 @@ const (
 	hostsEnd   = "# <<< LokalKit"
 )
 
+// hostsPathOverride lets tests point at a temporary hosts file.
+var hostsPathOverride string
+
 func HostsFilePath() string {
+	if hostsPathOverride != "" {
+		return hostsPathOverride
+	}
 	if runtime.GOOS == "windows" {
 		root := os.Getenv("SystemRoot")
 		if root == "" {
@@ -222,6 +228,11 @@ func SyncHostsFile(hosts []string) (changed bool, err error) {
 	if want == string(cur) {
 		return false, nil
 	}
+	// A read-only hosts file (set by some "protection" tools) blocks writes
+	// even for admins; on Windows Chmod clears the read-only attribute.
+	if st, err := os.Stat(path); err == nil && st.Mode().Perm()&0o200 == 0 {
+		_ = os.Chmod(path, 0o644)
+	}
 	if err := os.WriteFile(path, []byte(want), 0o644); err != nil {
 		if errors.Is(err, fs.ErrPermission) {
 			return true, ErrNeedAdmin
@@ -248,33 +259,95 @@ func (m *Manager) SyncHosts() error {
 	changed, err := SyncHostsFile(m.hostNames())
 	if err == nil {
 		if changed {
+			flushDNS()
 			m.Logf("info", "Hosts file updated")
 		}
 		return nil
 	}
 	if !errors.Is(err, ErrNeedAdmin) || runtime.GOOS != "windows" {
-		return err
+		return fmt.Errorf("cannot update the hosts file: %w", err)
 	}
-	m.Logf("info", "Asking for admin rights to update the hosts file...")
+	m.Logf("info", "Asking for admin rights to update the hosts file (approve the Windows prompt)...")
+	helperLog := filepath.Join(m.P.Logs, "hosts-helper.log")
+	_ = os.Remove(helperLog)
 	exe, _ := os.Executable()
 	q := func(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
-	ps := fmt.Sprintf(`Start-Process -FilePath %s -ArgumentList '--sync-hosts', %s -Verb RunAs -Wait -WindowStyle Hidden`,
+	ps := fmt.Sprintf(`$p = Start-Process -FilePath %s -ArgumentList '--sync-hosts', %s -Verb RunAs -Wait -WindowStyle Hidden -PassThru; exit $p.ExitCode`,
 		q(exe), q(`"`+m.P.Root+`"`))
 	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", ps)
 	hideWindow(cmd)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("hosts file not updated (admin rights declined?): %s", lastLines(string(out), 2))
+	out, runErr := cmd.CombinedOutput()
+	if still, _ := SyncHostsFile(m.hostNames()); !still {
+		flushDNS()
+		m.Logf("ok", "Hosts file updated")
+		return nil
 	}
-	if changed, _ := SyncHostsFile(m.hostNames()); changed {
-		return errors.New("the hosts file is still not updated")
+	detail := strings.TrimSpace(readSmall(helperLog))
+	if detail == "" && runErr != nil {
+		detail = lastLines(string(out), 2)
+		if strings.Contains(detail, "canceled") || strings.Contains(detail, "cancelled") {
+			detail = "the Windows admin prompt was declined"
+		}
 	}
-	m.Logf("info", "Hosts file updated")
-	return nil
+	if detail == "" {
+		detail = "unknown reason"
+	}
+	return fmt.Errorf("could not add your projects to the hosts file (%s). %s", detail, manualHostsHint)
 }
 
-// RunElevatedHostsSync is what "lokalkit.exe --sync-hosts <root>" runs as admin.
-func RunElevatedHostsSync(root string) error {
+const manualHostsHint = `You can add them by hand: open Notepad as administrator, open C:\Windows\System32\drivers\etc\hosts and add a line like "127.0.0.1 project.test" for each project`
+
+// MissingFromHosts returns project hosts that the hosts file does not map yet.
+func (m *Manager) MissingFromHosts() []string {
+	b, _ := os.ReadFile(HostsFilePath())
+	have := map[string]bool{}
+	for _, line := range strings.Split(string(b), "\n") {
+		if i := strings.IndexByte(line, '#'); i >= 0 {
+			line = line[:i]
+		}
+		f := strings.Fields(line)
+		for _, h := range f[min(1, len(f)):] {
+			have[strings.ToLower(h)] = true
+		}
+	}
+	var missing []string
+	for _, h := range m.hostNames() {
+		if !have[h] {
+			missing = append(missing, h)
+		}
+	}
+	return missing
+}
+
+func readSmall(path string) string {
+	b, err := os.ReadFile(path)
+	if err != nil || len(b) > 4096 {
+		return ""
+	}
+	return string(b)
+}
+
+// flushDNS clears Windows' DNS cache so a name that failed to resolve a
+// moment ago ("NXDOMAIN") is looked up again in the new hosts file.
+func flushDNS() {
+	if runtime.GOOS != "windows" {
+		return
+	}
+	cmd := exec.Command("ipconfig", "/flushdns")
+	hideWindow(cmd)
+	_ = cmd.Run()
+}
+
+// RunElevatedHostsSync is what "lokalkit.exe --sync-hosts <root>" runs as
+// admin. Errors are also written to logs/hosts-helper.log for the main app.
+func RunElevatedHostsSync(root string) (err error) {
 	p := NewPaths(root)
+	defer func() {
+		if err != nil {
+			_ = os.MkdirAll(p.Logs, 0o755)
+			_ = os.WriteFile(filepath.Join(p.Logs, "hosts-helper.log"), []byte(err.Error()), 0o644)
+		}
+	}()
 	cfg, err := LoadConfig(filepath.Join(root, "lokalkit.json"))
 	if err != nil {
 		return err
