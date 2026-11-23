@@ -31,7 +31,7 @@ func (s *MySQL) Info() ServiceInfo {
 	return ServiceInfo{
 		ID: "mysql", Name: name, Installed: bin != "",
 		Version: probeVersion(bin, "--version"), Running: s.proc.Running(),
-		Ports: fmt.Sprint(s.m.config().MySQLPort), Hint: `bin\mysql\<versi>\bin\mysqld.exe`,
+		Ports: fmt.Sprint(s.m.config().MySQLPort), Hint: `bin\mysql\<version>\bin\mysqld.exe`,
 	}
 }
 

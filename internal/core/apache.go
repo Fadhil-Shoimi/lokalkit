@@ -30,7 +30,7 @@ func (a *Apache) Info() ServiceInfo {
 	return ServiceInfo{
 		ID: "apache", Name: "Apache", Installed: bin != "",
 		Version: probeVersion(bin, "-v"), Running: a.proc.Running(),
-		Ports: a.ports(cfg), Hint: `bin\apache\<versi>\bin\httpd.exe`,
+		Ports: a.ports(cfg), Hint: `bin\apache\<version>\bin\httpd.exe`,
 	}
 }
 

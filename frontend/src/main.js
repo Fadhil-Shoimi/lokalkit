@@ -61,6 +61,7 @@ function renderServices(services) {
 
 function renderProjects(projects) {
   $('#projCount').textContent = projects.length || '';
+  $('#projCount').hidden = !projects.length;
   const apacheUp = state.services?.find((s) => s.id === 'apache')?.running;
   if (!projects.length) {
     $('#projects').innerHTML = `<div class="empty">No projects yet. Create one above, or put a folder in <b>www</b>.</div>`;
@@ -87,7 +88,7 @@ function renderProjects(projects) {
 function renderPHP() {
   const sel = $('#phpSelect');
   if (!state.php?.length) {
-    sel.innerHTML = '<option>none</option>';
+    sel.innerHTML = '<option>not found</option>';
     sel.disabled = true;
     return;
   }

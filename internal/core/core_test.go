@@ -232,3 +232,13 @@ func TestCertificates(t *testing.T) {
 		t.Error("leaf validity too long for browsers")
 	}
 }
+
+func TestStartAllNothingInstalled(t *testing.T) {
+	m, err := NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.StartAll(); err != ErrNothingInstalled {
+		t.Fatalf("got %v", err)
+	}
+}

@@ -224,8 +224,21 @@ func (m *Manager) Stop(id string) error {
 	return nil
 }
 
+// ErrNothingInstalled is returned by StartAll when bin\ has no servers yet.
+var ErrNothingInstalled = errors.New(`no services found yet. Put Apache, PHP and MySQL in the bin folder (click "Open bin"), then try again`)
+
 // StartAll starts every installed service in parallel.
 func (m *Manager) StartAll() error {
+	installed := false
+	for _, s := range m.services {
+		if s.Info().Installed {
+			installed = true
+		}
+	}
+	if !installed {
+		m.Logf("error", "%v. LokalKit folder: %s", ErrNothingInstalled, m.P.Root)
+		return ErrNothingInstalled
+	}
 	return m.forAll(func(s Service) error {
 		if !s.Info().Installed {
 			return nil
