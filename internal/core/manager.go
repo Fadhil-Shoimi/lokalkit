@@ -252,6 +252,18 @@ func (m *Manager) forAll(fn func(Service) error) error {
 
 func (m *Manager) AnyRunning() bool { return m.anyRunning() }
 
+// Toggle starts a stopped service or stops a running one.
+func (m *Manager) Toggle(id string) error {
+	s, err := m.service(id)
+	if err != nil {
+		return err
+	}
+	if s.Running() {
+		return m.Stop(id)
+	}
+	return m.Start(id)
+}
+
 // Reload regenerates virtual hosts + hosts file and restarts Apache if running.
 func (m *Manager) Reload() error {
 	if err := m.WriteVhosts(); err != nil {

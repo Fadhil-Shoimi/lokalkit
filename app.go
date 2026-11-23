@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"lokalkit/internal/core"
+	"lokalkit/internal/tray"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -15,9 +16,12 @@ const AppVersion = "0.1.0"
 // App is the bridge between the Go engine and the web UI.
 // Every exported method is callable from JavaScript.
 type App struct {
-	ctx     context.Context
-	m       *core.Manager
-	initErr string
+	ctx      context.Context
+	m        *core.Manager
+	initErr  string
+	tray     *tray.Tray
+	quitting bool // true when quitting for real (tray "Keluar"), not hiding
+	hidTold  bool // already told the user the app keeps running in the tray
 }
 
 func NewApp() *App { return &App{} }
@@ -26,27 +30,90 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	m, err := core.NewManager(core.ResolveRoot(), func(event string, data any) {
 		runtime.EventsEmit(ctx, event, data)
+		if event == "services" && a.tray != nil {
+			if svcs, ok := data.([]core.ServiceInfo); ok {
+				a.tray.Update(svcs)
+			}
+		}
 	})
 	if err != nil {
 		a.initErr = err.Error()
 		return
 	}
 	a.m = m
+	a.tray = tray.Start(a.trayActions(), m.Services())
 	m.Logf("info", "LokalKit %s sedia. Folder: %s", AppVersion, m.P.Root)
 	if m.Config().StartAllOnLaunch {
 		go m.StartAll()
 	}
 }
 
+// trayActions maps the tray menu to app actions. Long work runs in its own
+// goroutine so the tray menu never freezes.
+func (a *App) trayActions() tray.Actions {
+	bg := func(fn func() error) func() {
+		return func() {
+			go func() {
+				if err := fn(); err != nil {
+					a.m.Logf("error", "%v", err)
+				}
+			}()
+		}
+	}
+	return tray.Actions{
+		Show:         a.ShowWindow,
+		StartAll:     bg(a.m.StartAll),
+		StopAll:      bg(a.m.StopAll),
+		Toggle:       func(id string) { bg(func() error { return a.m.Toggle(id) })() },
+		OpenWeb:      a.OpenWeb,
+		OpenDatabase: bg(a.OpenDatabase),
+		OpenTerminal: bg(func() error { return a.OpenTerminal("") }),
+		OpenWWW:      bg(func() error { return a.OpenFolder("www") }),
+		OpenMailpit:  a.OpenMailpit,
+		Quit:         a.QuitApp,
+	}
+}
+
+// ShowWindow brings the window back from the tray (or from minimised).
+func (a *App) ShowWindow() {
+	runtime.WindowUnminimise(a.ctx)
+	runtime.WindowShow(a.ctx)
+	runtime.WindowSetAlwaysOnTop(a.ctx, true)
+	runtime.WindowSetAlwaysOnTop(a.ctx, false)
+}
+
+// QuitApp really exits: stops services (per settings) and removes the tray icon.
+func (a *App) QuitApp() {
+	a.quitting = true
+	runtime.Quit(a.ctx)
+}
+
 func (a *App) shutdown(ctx context.Context) {
 	if a.m != nil && a.m.Config().StopAllOnExit {
 		_ = a.m.StopAll()
 	}
+	if a.tray != nil {
+		a.tray.Stop()
+	}
 }
 
-// beforeClose asks for confirmation when services are still running.
+// beforeClose runs when the window's X is clicked. With "minimize to tray"
+// on, the window is hidden and LokalKit keeps running in the system tray.
+// Returning true cancels the close.
 func (a *App) beforeClose(ctx context.Context) bool {
-	if a.m == nil || !a.m.AnyRunning() || !a.m.Config().StopAllOnExit {
+	if a.m == nil || a.quitting {
+		return false
+	}
+	cfg := a.m.Config()
+	if cfg.MinimizeToTray && a.tray != nil {
+		runtime.WindowHide(ctx)
+		if !a.hidTold {
+			a.hidTold = true
+			a.m.Logf("info", "LokalKit masih berjalan di system tray. Klik kanan ikon suis untuk keluar.")
+		}
+		return true
+	}
+	if !a.m.AnyRunning() || !cfg.StopAllOnExit {
 		return false
 	}
 	res, err := runtime.MessageDialog(ctx, runtime.MessageDialogOptions{

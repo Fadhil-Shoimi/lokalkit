@@ -43,6 +43,8 @@ func main() {
 		OnBeforeClose:    app.beforeClose,
 		SingleInstanceLock: &options.SingleInstanceLock{
 			UniqueId: "my.codeslab.lokalkit",
+			// Opening LokalKit again while it sits in the tray shows the window.
+			OnSecondInstanceLaunch: func(options.SecondInstanceData) { app.ShowWindow() },
 		},
 		Windows: &windows.Options{
 			Theme: windows.SystemDefault,

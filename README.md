@@ -17,6 +17,7 @@ Persekitaran pembangunan PHP lokal untuk Windows. Satu klik untuk **Apache + PHP
 - Emel PHP `mail()` terus ke Mailpit
 - Butang pantas: Web, Database (HeidiSQL/Adminer), Terminal (PHP, Composer, MySQL dalam PATH), folder www
 - Cipta projek baru: PHP kosong atau **Laravel** (database dicipta sekali)
+- **System tray**: ikon suis di taskbar (kuning = ada servis berjalan, kelabu = berhenti). Klik untuk buka, klik kanan untuk mula/henti servis dan pintasan. Butang X sembunyikan app ke tray (boleh ditukar dalam Tetapan)
 - Port boleh ditukar. Semua dalam satu folder, jadi boleh dibawa ke mana-mana (portable)
 
 ## Struktur folder
@@ -63,6 +64,16 @@ Boleh ada beberapa versi PHP dalam `bin\php\`, kemudian pilih versi dari menu at
 4. Tekan **▶ Mula Semua** dan buka `http://localhost`.
 
 Kali pertama Apache dimulakan dengan projek, Windows akan minta kebenaran admin (UAC) untuk kemas kini fail hosts. Ini normal.
+
+## System tray
+
+- **Klik** ikon suis: buka tetingkap LokalKit
+- **Klik kanan**: Mula/Henti Semua, mula/henti setiap servis, buka localhost, Database, Terminal, folder www, Mailpit
+- Butang **X** hanya sembunyikan tetingkap. Untuk keluar sepenuhnya: klik kanan ikon → **Keluar**
+- Buka `LokalKit.exe` sekali lagi semasa ia dalam tray akan tunjuk semula tetingkap
+- Tak suka? Matikan "Butang tutup (X) sembunyikan LokalKit ke system tray" dalam **Tetapan**
+
+> Windows kadang-kadang sorok ikon baru dalam menu `^`. Seret ikon suis ke taskbar supaya sentiasa nampak.
 
 ## Database (Laravel `.env`)
 
@@ -114,7 +125,7 @@ Struktur kod:
 
 ## Pelan seterusnya
 
-- [ ] Ikon di system tray
+- [x] Ikon di system tray
 - [ ] SSL lokal (`https://projek.test`) dengan mkcert
 - [ ] Muat turun binary terus dari dalam app
 - [ ] Redis, PostgreSQL, Node.js

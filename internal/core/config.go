@@ -19,6 +19,7 @@ type Config struct {
 	AutoVhost        bool   `json:"autoVhost"`
 	StartAllOnLaunch bool   `json:"startAllOnLaunch"`
 	StopAllOnExit    bool   `json:"stopAllOnExit"`
+	MinimizeToTray   bool   `json:"minimizeToTray"` // close button hides to the system tray
 }
 
 func DefaultConfig() Config {
@@ -31,6 +32,7 @@ func DefaultConfig() Config {
 		AutoVhost:        true,
 		StartAllOnLaunch: false,
 		StopAllOnExit:    true,
+		MinimizeToTray:   true,
 	}
 }
 

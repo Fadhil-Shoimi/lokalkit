@@ -207,6 +207,7 @@ $('#settings').addEventListener('submit', async (ev) => {
     autoVhost: f.autoVhost.checked,
     startAllOnLaunch: f.startAllOnLaunch.checked,
     stopAllOnExit: f.stopAllOnExit.checked,
+    minimizeToTray: f.minimizeToTray.checked,
   };
   const ok = await run(async () => { await api.SaveConfig(cfg); return true; }, ev.submitter);
   if (ok) { toast('Tetapan disimpan'); await refresh(); }
