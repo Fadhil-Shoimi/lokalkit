@@ -15,6 +15,8 @@ func hideWindow(cmd *exec.Cmd) {
 
 func newConsole(cmd *exec.Cmd) {}
 
+func terminalCommand(dir, command string) *exec.Cmd { return exec.Command("sh", "-c", command) }
+
 func killTree(pid int) {
 	if err := syscall.Kill(-pid, syscall.SIGKILL); err != nil {
 		_ = syscall.Kill(pid, syscall.SIGKILL)

@@ -57,14 +57,10 @@ func (m *Manager) OpenTerminal(dir, command string) error {
 	env := envWithPath(m.toolDirs())
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
-		args := []string{"/K"}
-		if command != "" {
-			args = append(args, command)
-		} else {
-			args = append(args, "title LokalKit Terminal && php -v")
+		if command == "" {
+			command = "php -v"
 		}
-		cmd = exec.Command("cmd.exe", args...)
-		newConsole(cmd)
+		cmd = terminalCommand(dir, command)
 	} else {
 		term := os.Getenv("TERMINAL")
 		if term == "" {
