@@ -20,7 +20,7 @@ type App struct {
 	m        *core.Manager
 	initErr  string
 	tray     *tray.Tray
-	quitting bool // true when quitting for real (tray "Keluar"), not hiding
+	quitting bool // true when quitting for real (tray "Quit"), not hiding
 	hidTold  bool // already told the user the app keeps running in the tray
 }
 
@@ -42,7 +42,7 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.m = m
 	a.tray = tray.Start(a.trayActions(), m.Services())
-	m.Logf("info", "LokalKit %s sedia. Folder: %s", AppVersion, m.P.Root)
+	m.Logf("info", "LokalKit %s ready. Folder: %s", AppVersion, m.P.Root)
 	if m.Config().StartAllOnLaunch {
 		go m.StartAll()
 	}
@@ -109,7 +109,7 @@ func (a *App) beforeClose(ctx context.Context) bool {
 		runtime.WindowHide(ctx)
 		if !a.hidTold {
 			a.hidTold = true
-			a.m.Logf("info", "LokalKit masih berjalan di system tray. Klik kanan ikon suis untuk keluar.")
+			a.m.Logf("info", "LokalKit is still running in the system tray. Right-click the switch icon to quit.")
 		}
 		return true
 	}
@@ -118,16 +118,16 @@ func (a *App) beforeClose(ctx context.Context) bool {
 	}
 	res, err := runtime.MessageDialog(ctx, runtime.MessageDialogOptions{
 		Type:          runtime.QuestionDialog,
-		Title:         "Keluar LokalKit?",
-		Message:       "Servis masih berjalan. Semua servis akan dihentikan. Teruskan?",
-		Buttons:       []string{"Ya", "Tidak"},
-		DefaultButton: "Ya",
-		CancelButton:  "Tidak",
+		Title:         "Quit LokalKit?",
+		Message:       "Services are still running and will all be stopped. Continue?",
+		Buttons:       []string{"Yes", "No"},
+		DefaultButton: "Yes",
+		CancelButton:  "No",
 	})
 	if err != nil {
 		return false
 	}
-	return res != "Ya" && res != "Yes" && res != "Ok"
+	return res != "Yes" && res != "Ok"
 }
 
 type State struct {
@@ -162,7 +162,7 @@ func (a *App) GetState() State {
 
 func (a *App) ready() error {
 	if a.m == nil {
-		return fmt.Errorf("LokalKit tidak dapat dimulakan: %s", a.initErr)
+		return fmt.Errorf("LokalKit could not start: %s", a.initErr)
 	}
 	return nil
 }

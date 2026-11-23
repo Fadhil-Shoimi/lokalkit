@@ -57,16 +57,16 @@ func NewManager(root string, emit Emitter) (*Manager, error) {
 	}
 	m := &Manager{P: NewPaths(root), emit: emit, busy: map[string]bool{}}
 	if err := m.P.Ensure(); err != nil {
-		return nil, fmt.Errorf("tidak dapat cipta folder dalam %s: %w", root, err)
+		return nil, fmt.Errorf("cannot create folders in %s: %w", root, err)
 	}
 	cfg, err := LoadConfig(m.configPath())
 	m.cfg = cfg
 	if err != nil {
-		m.Logf("error", "%v (guna tetapan asal)", err)
+		m.Logf("error", "%v (using default settings)", err)
 	}
 	onExit := func(name string, expected bool, err error) {
 		if !expected {
-			m.Logf("error", "%s terhenti tanpa diduga (%v)", name, err)
+			m.Logf("error", "%s stopped unexpectedly (%v)", name, err)
 		}
 		m.emitServices()
 	}
@@ -101,7 +101,7 @@ func (m *Manager) SaveConfig(c Config) (bool, error) {
 	old := m.cfg
 	m.cfg = c
 	m.cfgMu.Unlock()
-	m.Logf("ok", "Tetapan disimpan")
+	m.Logf("ok", "Settings saved")
 	return old != c && m.anyRunning(), nil
 }
 
@@ -150,7 +150,7 @@ func (m *Manager) service(id string) (Service, error) {
 			return s, nil
 		}
 	}
-	return nil, fmt.Errorf("servis tidak dikenali: %s", id)
+	return nil, fmt.Errorf("unknown service: %s", id)
 }
 
 func (m *Manager) setBusy(id string, b bool) bool {
@@ -193,12 +193,12 @@ func (m *Manager) Start(id string) error {
 			m.Logf("error", "%v", err)
 		}
 	}
-	m.Logf("info", "Memulakan %s...", name)
+	m.Logf("info", "Starting %s...", name)
 	if err := s.Start(); err != nil {
 		m.Logf("error", "%v", err)
 		return err
 	}
-	m.Logf("ok", "%s berjalan", name)
+	m.Logf("ok", "%s is running", name)
 	return nil
 }
 
@@ -215,12 +215,12 @@ func (m *Manager) Stop(id string) error {
 		return nil
 	}
 	defer m.setBusy(id, false)
-	m.Logf("info", "Menghentikan %s...", name)
+	m.Logf("info", "Stopping %s...", name)
 	if err := s.Stop(); err != nil {
 		m.Logf("error", "%v", err)
 		return err
 	}
-	m.Logf("ok", "%s dihentikan", name)
+	m.Logf("ok", "%s stopped", name)
 	return nil
 }
 
@@ -280,7 +280,7 @@ func (m *Manager) Reload() error {
 		}
 		return m.Start("apache")
 	}
-	m.Logf("ok", "Virtual host dikemas kini")
+	m.Logf("ok", "Virtual hosts updated")
 	return nil
 }
 

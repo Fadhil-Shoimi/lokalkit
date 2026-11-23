@@ -41,20 +41,20 @@ function renderServices(services) {
   state.services = services;
   $('#services').innerHTML = services.map((s) => {
     const cls = ['svc', s.running && 'running', s.busy && 'busy'].filter(Boolean).join(' ');
-    const label = s.busy ? '…' : s.running ? 'Henti' : 'Mula';
+    const label = s.busy ? '…' : s.running ? 'Stop' : 'Start';
     const detail = s.installed
       ? `<div class="svc-name">${esc(s.name)}<small>${esc(s.version)}</small></div>`
-      : `<div><div class="svc-name">${esc(s.name)}</div><div class="svc-missing">Tidak dijumpai. Letak di <code>${esc(s.hint)}</code></div></div>`;
+      : `<div><div class="svc-name">${esc(s.name)}</div><div class="svc-missing">Not found. Put it in <code>${esc(s.hint)}</code></div></div>`;
     const button = s.installed
       ? `<button class="btn ${s.running ? 'danger' : ''}" data-svc="${s.id}" ${s.busy ? 'disabled' : ''}>${label}</button>`
-      : `<button class="btn small ghost" data-folder="bin">Buka bin</button>`;
+      : `<button class="btn small ghost" data-folder="bin">Open bin</button>`;
     return `<div class="${cls}"><span class="dot"></span>${detail}<span class="svc-port">${esc(s.ports)}</span>${button}</div>`;
   }).join('');
 
   const anyRunning = services.some((s) => s.running);
   const anyBusy = services.some((s) => s.busy);
   const all = $('#btnAll');
-  all.textContent = anyRunning ? '■ Henti Semua' : '▶ Mula Semua';
+  all.textContent = anyRunning ? '■ Stop All' : '▶ Start All';
   all.disabled = anyBusy;
   all.dataset.mode = anyRunning ? 'stop' : 'start';
 }
@@ -63,7 +63,7 @@ function renderProjects(projects) {
   $('#projCount').textContent = projects.length || '';
   const apacheUp = state.services?.find((s) => s.id === 'apache')?.running;
   if (!projects.length) {
-    $('#projects').innerHTML = `<div class="empty">Belum ada projek. Cipta projek baru di atas, atau letak folder dalam <b>www</b>.</div>`;
+    $('#projects').innerHTML = `<div class="empty">No projects yet. Create one above, or put a folder in <b>www</b>.</div>`;
     return;
   }
   $('#projects').innerHTML = projects.map((p) => `
@@ -72,9 +72,9 @@ function renderProjects(projects) {
         <div class="proj-name">${esc(p.name)}${p.kind !== 'php' ? `<span class="badge ${p.kind}">${p.kind}</span>` : ''}</div>
         <div class="proj-links">
           ${p.https
-            ? `<a class="proj-url" data-url="${esc(p.https)}" title="${apacheUp ? 'Buka dalam pelayar' : 'Mulakan Apache dahulu'}">${esc(p.https)}</a>
+            ? `<a class="proj-url" data-url="${esc(p.https)}" title="${apacheUp ? 'Open in browser' : 'Start Apache first'}">${esc(p.https)}</a>
                <a class="proj-url alt" data-url="${esc(p.url)}">http</a>`
-            : `<a class="proj-url" data-url="${esc(p.url)}" title="${apacheUp ? 'Buka dalam pelayar' : 'Mulakan Apache dahulu'}">${esc(p.url)}</a>`}
+            : `<a class="proj-url" data-url="${esc(p.url)}" title="${apacheUp ? 'Open in browser' : 'Start Apache first'}">${esc(p.url)}</a>`}
         </div>
       </div>
       <div class="proj-btns">
@@ -87,7 +87,7 @@ function renderProjects(projects) {
 function renderPHP() {
   const sel = $('#phpSelect');
   if (!state.php?.length) {
-    sel.innerHTML = '<option>tiada</option>';
+    sel.innerHTML = '<option>none</option>';
     sel.disabled = true;
     return;
   }
@@ -122,13 +122,13 @@ function renderSSL(ssl) {
   const btn = $('#btnTrust');
   if (!ssl) return;
   if (!ssl.caExists) {
-    el.textContent = 'Sijil akan dicipta bila Apache dimulakan dengan HTTPS.';
+    el.textContent = 'A certificate will be created when Apache starts with HTTPS on.';
     el.className = 'muted-text';
   } else if (ssl.trusted) {
-    el.textContent = '✓ Sijil LokalKit dipercayai oleh Windows';
+    el.textContent = '✓ Windows trusts the LokalKit certificate';
     el.className = 'muted-text ok';
   } else {
-    el.textContent = 'Sijil belum dipercayai: pelayar akan tunjuk amaran.';
+    el.textContent = 'Certificate not trusted yet: browsers will show a warning.';
     el.className = 'muted-text warn';
   }
   btn.hidden = !ssl.supported || !ssl.caExists || ssl.trusted;
@@ -181,7 +181,7 @@ document.addEventListener('click', (ev) => {
       term: () => api.OpenTerminal(''),
       www: () => api.OpenFolder('www'),
       mail: () => api.OpenMailpit(),
-      reload: async () => { await api.Reload(); await refreshProjects(); toast('Virtual host dikemas kini'); },
+      reload: async () => { await api.Reload(); await refreshProjects(); toast('Virtual hosts updated'); },
     };
     run(acts[t.dataset.act], t);
   }
@@ -202,7 +202,7 @@ $('#newProject').addEventListener('submit', async (ev) => {
   if (p) {
     $('#npName').value = '';
     await refreshProjects();
-    toast(`Projek ${p.name} dicipta → ${p.url || ''}`);
+    toast(`Project ${p.name} created → ${p.https || p.url || ''}`);
   }
 });
 
@@ -214,7 +214,7 @@ $('#npName').addEventListener('input', (e) => {
 $('#phpSelect').addEventListener('change', async (e) => {
   const cfg = { ...state.config, phpVersion: e.target.value };
   const ok = await run(async () => { await api.SaveConfig(cfg); return true; });
-  if (ok) { state.config = cfg; toast('Versi PHP ditukar'); } else renderPHP();
+  if (ok) { state.config = cfg; toast('PHP version changed'); } else renderPHP();
 });
 
 $('#settings').addEventListener('submit', async (ev) => {
@@ -235,12 +235,12 @@ $('#settings').addEventListener('submit', async (ev) => {
     sslPort: +f.sslPort.value,
   };
   const ok = await run(async () => { await api.SaveConfig(cfg); return true; }, ev.submitter);
-  if (ok) { toast('Tetapan disimpan'); await refresh(); }
+  if (ok) { toast('Settings saved'); await refresh(); }
 });
 
 $('#btnTrust').addEventListener('click', async (ev) => {
   const st = await run(() => api.TrustCA(), ev.currentTarget);
-  if (st) { state.ssl = st; renderSSL(st); if (st.trusted) toast('Sijil dipercayai. Mulakan semula pelayar jika perlu.'); }
+  if (st) { state.ssl = st; renderSSL(st); if (st.trusted) toast('Certificate trusted. Restart your browser if needed.'); }
 });
 
 on('services', (s) => { renderServices(s); renderProjects(state.projects || []); });

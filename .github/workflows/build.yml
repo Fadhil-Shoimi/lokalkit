@@ -38,6 +38,6 @@ jobs:
         shell: bash
         run: |
           tag="${{ github.event.release.tag_name }}"
-          # Release mungkin sudah dicipta dari laman GitHub; jika belum, cipta.
+          # The release may already exist (published from the GitHub website); create it if not.
           gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --generate-notes --title "LokalKit $tag"
           gh release upload "$tag" build/bin/LokalKit.exe --clobber

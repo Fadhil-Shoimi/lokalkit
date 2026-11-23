@@ -114,7 +114,7 @@ func (m *Manager) OpenDatabase() (url string, err error) {
 	if exists(filepath.Join(m.adminerDir(), "index.php")) {
 		return m.LocalURL("/adminer/"), nil
 	}
-	return "", errors.New("tiada alat database. Letak HeidiSQL dalam bin\\heidisql atau adminer.php dalam etc\\apps\\adminer\\index.php")
+	return "", errors.New("no database tool found. Put HeidiSQL in bin\\heidisql or adminer.php at etc\\apps\\adminer\\index.php")
 }
 
 func (m *Manager) adminerDir() string { return filepath.Join(m.P.Etc, "apps", "adminer") }
@@ -135,11 +135,11 @@ func (m *Manager) MailpitURL() string {
 func (m *Manager) CreateProject(name, kind string) (Project, error) {
 	label := HostLabel(name)
 	if label == "" || label != name {
-		return Project{}, errors.New("nama projek hanya boleh huruf kecil, nombor dan '-' (contoh: kedai-runcit)")
+		return Project{}, errors.New("project names may only contain lowercase letters, numbers and '-' (e.g. my-shop)")
 	}
 	dir := filepath.Join(m.P.WWW, name)
 	if exists(dir) {
-		return Project{}, fmt.Errorf("folder %s sudah wujud", name)
+		return Project{}, fmt.Errorf("folder %s already exists", name)
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return Project{}, err
@@ -148,28 +148,28 @@ func (m *Manager) CreateProject(name, kind string) (Project, error) {
 	case "laravel":
 		if m.ensureComposerShim() == "" {
 			_ = os.Remove(dir)
-			return Project{}, errors.New("Composer tidak dijumpai. Letak composer.phar dalam bin\\composer")
+			return Project{}, errors.New("Composer not found. Put composer.phar in bin\\composer")
 		}
-		if err := m.OpenTerminal(dir, "composer create-project laravel/laravel . && echo. && echo Siap! Projek Laravel sedia."); err != nil {
+		if err := m.OpenTerminal(dir, "composer create-project laravel/laravel . && echo. && echo Done! Your Laravel project is ready."); err != nil {
 			return Project{}, err
 		}
 		// Create a database with the same name if MySQL is running.
 		if s, _ := m.service("mysql"); s.Running() {
 			db := "`" + filepathSafeDB(name) + "`"
 			if err := s.(*MySQL).Exec("CREATE DATABASE IF NOT EXISTS " + db + " CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"); err != nil {
-				m.Logf("error", "Gagal cipta database: %v", err)
+				m.Logf("error", "Failed to create database: %v", err)
 			} else {
-				m.Logf("ok", "Database %s dicipta", filepathSafeDB(name))
+				m.Logf("ok", "Database %s created", filepathSafeDB(name))
 			}
 		}
 		go m.reloadWhenReady(filepath.Join(dir, "public", "index.php"))
 	default:
-		page := fmt.Sprintf("<?php\n// Projek %s — dicipta oleh LokalKit\n?>\n<!doctype html>\n<html><head><meta charset=\"utf-8\"><title>%s</title></head>\n<body style=\"font-family:system-ui;padding:40px\">\n<h1>%s</h1>\n<p>PHP <?= PHP_VERSION ?> berjalan. Edit fail ini di <code><?= __FILE__ ?></code></p>\n</body></html>\n", name, name, name)
+		page := fmt.Sprintf("<?php\n// Project %s, created by LokalKit\n?>\n<!doctype html>\n<html><head><meta charset=\"utf-8\"><title>%s</title></head>\n<body style=\"font-family:system-ui;padding:40px\">\n<h1>%s</h1>\n<p>PHP <?= PHP_VERSION ?> is running. Edit this file at <code><?= __FILE__ ?></code></p>\n</body></html>\n", name, name, name)
 		if err := os.WriteFile(filepath.Join(dir, "index.php"), []byte(page), 0o644); err != nil {
 			return Project{}, err
 		}
 	}
-	m.Logf("ok", "Projek %s dicipta", name)
+	m.Logf("ok", "Project %s created", name)
 	if err := m.Reload(); err != nil {
 		m.Logf("error", "%v", err)
 	}

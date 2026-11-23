@@ -41,7 +41,7 @@ func (p *Proc) Start(bin string, args []string, dir string, env []string, logPat
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(f, "\n=== %s dimulakan %s ===\n", p.name, time.Now().Format("2006-01-02 15:04:05"))
+	fmt.Fprintf(f, "\n=== %s started %s ===\n", p.name, time.Now().Format("2006-01-02 15:04:05"))
 
 	cmd := exec.Command(bin, args...)
 	cmd.Dir = dir
@@ -103,7 +103,7 @@ func (p *Proc) Stop(graceful func() error, timeout time.Duration) error {
 	case <-done:
 		return nil
 	case <-time.After(8 * time.Second):
-		return fmt.Errorf("%s tidak dapat dihentikan", p.name)
+		return fmt.Errorf("%s could not be stopped", p.name)
 	}
 }
 
@@ -136,7 +136,7 @@ func waitPortFree(port int, timeout time.Duration) bool {
 	}
 }
 
-var errExited = errors.New("proses berhenti semasa dimulakan")
+var errExited = errors.New("the process exited while starting")
 
 // waitPort waits until the port accepts connections, the process exits, or timeout.
 func waitPort(port int, exited <-chan struct{}, timeout time.Duration) error {
@@ -153,5 +153,5 @@ func waitPort(port int, exited <-chan struct{}, timeout time.Duration) error {
 		case <-time.After(250 * time.Millisecond):
 		}
 	}
-	return fmt.Errorf("port %d tidak dibuka selepas %s", port, timeout)
+	return fmt.Errorf("port %d did not open after %s", port, timeout)
 }

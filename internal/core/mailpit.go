@@ -38,12 +38,12 @@ func (s *Mailpit) Start() error {
 	}
 	bin := s.bin()
 	if bin == "" {
-		return errors.New("Mailpit tidak dijumpai. Letak mailpit.exe dalam folder bin\\mailpit")
+		return errors.New("Mailpit not found. Put mailpit.exe in the bin\\mailpit folder")
 	}
 	cfg := s.m.config()
 	for _, p := range []int{cfg.MailpitSMTPPort, cfg.MailpitHTTPPort} {
 		if !waitPortFree(p, 8*time.Second) {
-			return fmt.Errorf("port %d sedang digunakan", p)
+			return fmt.Errorf("port %d is in use", p)
 		}
 	}
 	dbDir := filepath.Join(s.m.P.Data, "mailpit")
@@ -61,7 +61,7 @@ func (s *Mailpit) Start() error {
 	}
 	if err := waitPort(cfg.MailpitHTTPPort, s.proc.Exited(), 15*time.Second); err != nil {
 		_ = s.proc.Stop(nil, 0)
-		return fmt.Errorf("Mailpit gagal dimulakan (%v). Lihat logs\\mailpit.log", err)
+		return fmt.Errorf("Mailpit failed to start (%v). See logs\\mailpit.log", err)
 	}
 	return nil
 }

@@ -81,13 +81,13 @@ func (m *Manager) EnsurePHPIni(php PHPInstall) error {
 		}
 	}
 	if err != nil {
-		return fmt.Errorf("php.ini-development tidak dijumpai dalam %s", php.Dir)
+		return fmt.Errorf("php.ini-development not found in %s", php.Dir)
 	}
 	cfg := m.config()
 	out := BuildPHPIni(string(src), php.Dir, cfg.MailpitSMTPPort, func(ext string) bool {
 		return exists(filepath.Join(php.Dir, "ext", "php_"+ext+".dll"))
 	})
-	m.Logf("info", "php.ini dicipta untuk PHP %s", php.Version)
+	m.Logf("info", "Created php.ini for PHP %s", php.Version)
 	return os.WriteFile(ini, []byte(out), 0o644)
 }
 

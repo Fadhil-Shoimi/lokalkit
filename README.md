@@ -3,93 +3,93 @@
 <h1 align="center">LokalKit</h1>
 <p align="center">by Codeslab</p>
 
-Persekitaran pembangunan PHP lokal untuk Windows. Satu klik untuk **Apache + PHP + MySQL + Mailpit**, dengan virtual host automatik (`nama-projek.test`).
+A local PHP development environment for Windows. **Apache + PHP + MySQL + Mailpit** in one click, with automatic virtual hosts (`project-name.test`) and HTTPS.
 
 ![status](https://img.shields.io/badge/status-alpha-orange)
 
-## Ciri-ciri (v0.1)
+## Features
 
-- Mula/Henti Apache, MySQL/MariaDB dan Mailpit (atau **Mula Semua**)
-- **Auto virtual host**: setiap folder dalam `www\` jadi `http://folder.test` (fail hosts dikemas kini automatik, UAC diminta hanya bila perlu)
-- **HTTPS automatik**: setiap projek juga ada `https://folder.test` (dan `https://*.folder.test`), dengan sijil dari CA LokalKit sendiri tanpa perlu mkcert
-- Folder `public\` dikesan automatik (Laravel, Symfony)
-- Tukar versi PHP. `php.ini` dijana sendiri dengan extension biasa dihidupkan
-- MySQL kali pertama disediakan sendiri (`root` tanpa kata laluan)
-- Emel PHP `mail()` terus ke Mailpit
-- Butang pantas: Web, Database (HeidiSQL/Adminer), Terminal (PHP, Composer, MySQL dalam PATH), folder www
-- Cipta projek baru: PHP kosong atau **Laravel** (database dicipta sekali)
-- **System tray**: ikon suis di taskbar (kuning = ada servis berjalan, kelabu = berhenti). Klik untuk buka, klik kanan untuk mula/henti servis dan pintasan. Butang X sembunyikan app ke tray (boleh ditukar dalam Tetapan)
-- Port boleh ditukar. Semua dalam satu folder, jadi boleh dibawa ke mana-mana (portable)
+- Start/stop Apache, MySQL/MariaDB and Mailpit, one at a time or with **Start All**
+- **Automatic virtual hosts**: every folder in `www\` becomes `http://folder.test`. The hosts file is updated for you, and Windows asks for admin rights (UAC) only when something changes
+- **Automatic HTTPS**: every project also gets `https://folder.test` (and `https://*.folder.test`), signed by LokalKit's own local CA. No mkcert needed
+- `public\` folders are detected automatically (Laravel, Symfony)
+- Switch PHP versions. `php.ini` is generated for you with the common extensions enabled
+- MySQL is initialized on first start (`root`, no password)
+- PHP `mail()` goes straight to Mailpit
+- Quick buttons: Web, Database (HeidiSQL/Adminer), Terminal (PHP, Composer and MySQL on PATH), www folder
+- Create new projects: blank PHP or **Laravel** (a database is created too)
+- **System tray**: a switch icon in the taskbar (yellow = services running, grey = stopped). Click to open, right-click to start/stop services and for shortcuts. The X button hides the app to the tray (configurable in Settings)
+- Configurable ports. Everything lives in one folder, so the install is portable
 
-## Struktur folder
+## Folder layout
 
 ```
 C:\LokalKit\
 ├── LokalKit.exe
-├── lokalkit.json            ← tetapan (dicipta automatik)
+├── lokalkit.json            ← settings (created automatically)
 ├── bin\
 │   ├── apache\httpd-2.4.x\...\bin\httpd.exe
-│   ├── php\php-8.3.x-Win32-vs16-x64\php.exe   (mesti versi TS)
+│   ├── php\php-8.3.x-Win32-vs16-x64\php.exe   (must be a TS build)
 │   ├── mysql\mysql-8.4.x-winx64\bin\mysqld.exe
 │   ├── mailpit\mailpit.exe
 │   ├── composer\composer.phar
-│   ├── heidisql\heidisql.exe   (pilihan)
-│   ├── nodejs\node.exe         (pilihan)
-│   └── git\cmd\git.exe         (pilihan)
-├── etc\     ← config yang dijana (apache, mysql)
-├── www\     ← projek anda
-├── data\    ← data MySQL & Mailpit
+│   ├── heidisql\heidisql.exe   (optional)
+│   ├── nodejs\node.exe         (optional)
+│   └── git\cmd\git.exe         (optional)
+├── etc\     ← generated config (apache, mysql, ssl)
+├── www\     ← your projects
+├── data\    ← MySQL & Mailpit data
 └── logs\
 ```
 
-Boleh ada beberapa versi PHP dalam `bin\php\`, kemudian pilih versi dari menu atas.
+You can keep several PHP versions in `bin\php\` and pick one from the menu at the top.
 
-## Cara pasang
+## Installation
 
-1. Buat folder `C:\LokalKit` dan letak `LokalKit.exe` di dalamnya.
-2. Buka `LokalKit.exe` sekali. Folder `bin`, `www` dan lain-lain akan dicipta.
-3. Isi folder `bin\` dengan binary rasmi (semuanya percuma dan open-source):
+1. Create a `C:\LokalKit` folder and put `LokalKit.exe` in it.
+2. Run `LokalKit.exe` once. It creates `bin`, `www` and the other folders.
+3. Fill `bin\` with the official binaries (all free and open source):
 
-| Komponen | Muat turun | Letak di |
+| Component | Download | Put in |
 |---|---|---|
 | Apache (VS17 x64) | https://www.apachelounge.com/download/ | `bin\apache\` |
 | PHP **Thread Safe** x64 | https://windows.php.net/download/ | `bin\php\php-8.3.x\` |
 | MySQL (ZIP Archive) | https://dev.mysql.com/downloads/mysql/ | `bin\mysql\` |
 | Mailpit (windows-amd64) | https://github.com/axllent/mailpit/releases | `bin\mailpit\` |
 | Composer | https://getcomposer.org/download/latest-stable/composer.phar | `bin\composer\` |
-| HeidiSQL portable (pilihan) | https://www.heidisql.com/download.php | `bin\heidisql\` |
-| Adminer (pilihan) | https://www.adminer.org/ | `etc\apps\adminer\index.php` |
+| HeidiSQL portable (optional) | https://www.heidisql.com/download.php | `bin\heidisql\` |
+| Adminer (optional) | https://www.adminer.org/ | `etc\apps\adminer\index.php` |
 
-> **Dah ada Laragon?** Boleh salin terus folder dalam `C:\laragon\bin\` (apache, php, mysql, mailpit, composer, heidisql). Selepas salin PHP, **padam `php.ini`** dalam folder PHP tu supaya LokalKit jana yang baru (yang lama merujuk ke `C:\laragon`). **Tutup Laragon dulu** supaya port 80/3306 tak bertembung.
+> **Already using Laragon?** You can copy the folders in `C:\laragon\bin\` (apache, php, mysql, mailpit, composer, heidisql) straight across. After copying PHP, **delete its `php.ini`** so LokalKit generates a fresh one (the old one points at `C:\laragon`). **Close Laragon first** so ports 80/443/3306 don't clash.
 
-4. Tekan **▶ Mula Semua** dan buka `http://localhost`.
+4. Click **▶ Start All** and open `http://localhost`.
 
-Kali pertama Apache dimulakan dengan projek, Windows akan minta kebenaran admin (UAC) untuk kemas kini fail hosts. Ini normal.
+The first time Apache starts with projects, Windows asks for admin rights (UAC) to update the hosts file. This is expected.
 
 ## HTTPS (SSL)
 
-Bila Apache dimulakan dengan HTTPS hidup (lalai), LokalKit akan:
-1. Cipta **CA lokal** sekali sahaja dalam `etc\ssl\lokalkit-ca.crt`
-2. Jana satu sijil untuk semua projek (`projek.test`, `*.projek.test`, `localhost`). Sijil dijana semula secara automatik bila projek ditambah
-3. Minta Windows **percayai** CA tu. Tekan **Yes** pada dialog keselamatan Windows (sekali sahaja, tak perlu admin)
+When Apache starts with HTTPS on (the default), LokalKit:
+1. Creates a **local CA** once, in `etc\ssl\lokalkit-ca.crt`
+2. Issues one certificate for all projects (`project.test`, `*.project.test`, `localhost`). It is re-issued automatically when you add projects
+3. Asks Windows to **trust** the CA. Click **Yes** in the Windows security dialog (only once, no admin rights needed)
 
-Lepas tu `https://projek.test` terus jalan tanpa amaran dalam Chrome dan Edge.
+After that, `https://project.test` works without warnings in Chrome and Edge.
 
-- Dialog terlepas? **Tetapan → HTTPS → Percayai sijil**
-- **Firefox**: kalau masih ada amaran, buka `about:config`, set `security.enterprise_roots.enabled` = `true`, kemudian mulakan semula Firefox
-- Port 443 sibuk (Skype/VMware/IIS)? Tukar **Port HTTPS** dalam Tetapan. HTTP tetap jalan seperti biasa
-- Laravel di belakang HTTPS: set `APP_URL=https://projek.test` dalam `.env`
-- Fail `lokalkit-ca.key` ialah kunci rahsia CA. **Jangan kongsi** dengan sesiapa
+- Missed the dialog? **Settings → HTTPS → Trust certificate**
+- **Firefox**: if you still see a warning, open `about:config`, set `security.enterprise_roots.enabled` to `true`, then restart Firefox
+- Port 443 busy (Skype/VMware/IIS)? Change the **HTTPS port** in Settings. HTTP keeps working either way
+- Laravel behind HTTPS: set `APP_URL=https://project.test` in `.env`
+- `lokalkit-ca.key` is your CA's private key. **Never share it**
 
 ## System tray
 
-- **Klik** ikon suis: buka tetingkap LokalKit
-- **Klik kanan**: Mula/Henti Semua, mula/henti setiap servis, buka localhost, Database, Terminal, folder www, Mailpit
-- Butang **X** hanya sembunyikan tetingkap. Untuk keluar sepenuhnya: klik kanan ikon → **Keluar**
-- Buka `LokalKit.exe` sekali lagi semasa ia dalam tray akan tunjuk semula tetingkap
-- Tak suka? Matikan "Butang tutup (X) sembunyikan LokalKit ke system tray" dalam **Tetapan**
+- **Click** the switch icon: open the LokalKit window
+- **Right-click**: Start/Stop All, start/stop each service, open localhost, Database, Terminal, www folder, Mailpit
+- The **X** button only hides the window. To quit completely: right-click the icon → **Quit**
+- Running `LokalKit.exe` again while it is in the tray brings the window back
+- Don't like it? Turn off "Close button (X) hides LokalKit to the system tray" in **Settings**
 
-> Windows kadang-kadang sorok ikon baru dalam menu `^`. Seret ikon suis ke taskbar supaya sentiasa nampak.
+> Windows sometimes hides new icons in the `^` overflow menu. Drag the switch icon onto the taskbar to keep it visible.
 
 ## Database (Laravel `.env`)
 
@@ -105,15 +105,15 @@ MAIL_HOST=127.0.0.1
 MAIL_PORT=1025
 ```
 
-## Tetapan Apache sendiri
+## Custom Apache settings
 
-Fail `etc\apache\httpd.conf` dan `etc\apache\sites-enabled\auto.*.conf` **dijana semula** setiap kali Apache dimulakan. Untuk tetapan sendiri:
-- `etc\apache\custom.conf`: tetapan global
-- `etc\apache\sites-enabled\nama-lain.conf`: vhost manual (nama tidak bermula dengan `auto.`)
+`etc\apache\httpd.conf` and `etc\apache\sites-enabled\auto.*.conf` are **regenerated** every time Apache starts. For your own settings:
+- `etc\apache\custom.conf`: global settings
+- `etc\apache\sites-enabled\any-name.conf`: manual vhosts (any name not starting with `auto.`)
 
-## Pembangunan (untuk developer)
+## Development
 
-Keperluan: Go 1.24+, Node 20+, [Wails v2](https://wails.io).
+Requirements: Go 1.24+, Node 20+, [Wails v2](https://wails.io).
 
 ```bash
 go install github.com/wailsapp/wails/v2/cmd/wails@latest
@@ -131,22 +131,29 @@ wails build -platform windows/amd64
 go test ./internal/...
 ```
 
-Untuk `wails dev`, set `LOKALKIT_ROOT=C:\LokalKit` supaya ia guna folder sebenar.
+For `wails dev`, set `LOKALKIT_ROOT=C:\LokalKit` so it uses a real install folder.
 
-Struktur kod:
-- `assets/`: logo (SVG). Ikon app dijana dari `build/appicon.png`
-- `internal/core/`: enjin (urus proses, jana config Apache/MySQL/php.ini, vhost, fail hosts)
-- `app.go`: fungsi yang dipanggil oleh UI
-- `frontend/`: UI (HTML/CSS/JS + Vite)
+Integration test against a real Apache + PHP (Linux, needs `apache2` and `libapache2-mod-php`):
 
-## Pelan seterusnya
+```bash
+LOKALKIT_IT=1 go test -run Integration ./internal/core
+```
 
-- [x] Ikon di system tray
-- [x] SSL lokal (`https://projek.test`)
-- [ ] Muat turun binary terus dari dalam app
+Code layout:
+- `internal/core/`: the engine (process management, Apache/MySQL/php.ini config, vhosts, hosts file, SSL)
+- `internal/tray/`: system tray icon and menu
+- `app.go`: functions the UI calls
+- `frontend/`: the UI (HTML/CSS/JS + Vite)
+- `assets/`: logo (SVG). The app icon is generated from `build/appicon.png`
+
+## Roadmap
+
+- [x] System tray icon
+- [x] Local SSL (`https://project.test`)
+- [ ] Download binaries from inside the app
 - [ ] Redis, PostgreSQL, Node.js
 - [ ] Installer (NSIS)
-- [ ] Kongsi projek (tunnel)
+- [ ] Share projects (tunnel)
 
 ---
 © 2026 Codeslab

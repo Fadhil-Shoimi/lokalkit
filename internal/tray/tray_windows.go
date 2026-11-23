@@ -48,15 +48,15 @@ func (t *Tray) onReady() {
 	systray.SetTooltip("LokalKit")
 	systray.SetOnTapped(t.a.Show)
 
-	open := systray.AddMenuItem("Buka LokalKit", "Tunjuk tetingkap LokalKit")
+	open := systray.AddMenuItem("Open LokalKit", "Show the LokalKit window")
 	systray.AddSeparator()
-	t.all = systray.AddMenuItem("Mula Semua", "Mula atau henti semua servis")
+	t.all = systray.AddMenuItem("Start All", "Start or stop all services")
 
 	t.mu.Lock()
 	initial := t.last
 	t.mu.Unlock()
 	for _, svc := range initial {
-		item := systray.AddMenuItemCheckbox(ServiceTitle(svc), "Klik untuk mula/henti", svc.Running)
+		item := systray.AddMenuItemCheckbox(ServiceTitle(svc), "Click to start/stop", svc.Running)
 		t.services[svc.ID] = item
 		t.order = append(t.order, svc.ID)
 		id := svc.ID
@@ -64,13 +64,13 @@ func (t *Tray) onReady() {
 	}
 
 	systray.AddSeparator()
-	web := systray.AddMenuItem("Buka localhost", "")
+	web := systray.AddMenuItem("Open localhost", "")
 	db := systray.AddMenuItem("Database", "")
 	term := systray.AddMenuItem("Terminal", "")
-	www := systray.AddMenuItem("Folder www", "")
-	mail := systray.AddMenuItem("Mailpit (emel)", "")
+	www := systray.AddMenuItem("www folder", "")
+	mail := systray.AddMenuItem("Mailpit (email)", "")
 	systray.AddSeparator()
-	quit := systray.AddMenuItem("Keluar", "Henti semua servis dan keluar")
+	quit := systray.AddMenuItem("Quit", "Stop all services and quit")
 
 	go listen(open, t.a.Show)
 	go listen(t.all, func() {
@@ -125,9 +125,9 @@ func (t *Tray) Update(services []core.ServiceInfo) {
 	systray.SetTooltip(sum.Tooltip)
 
 	if sum.StopMode {
-		t.all.SetTitle("Henti Semua")
+		t.all.SetTitle("Stop All")
 	} else {
-		t.all.SetTitle("Mula Semua")
+		t.all.SetTitle("Start All")
 	}
 	if sum.AnyBusy || sum.Total == 0 {
 		t.all.Disable()

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ms">
+<html lang="en">
 <head>
   <meta charset="UTF-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
@@ -14,7 +14,7 @@
       <div class="by">by Codeslab</div>
     </div>
     <div class="top-right">
-      <label class="php-pick" title="Versi PHP">
+      <label class="php-pick" title="PHP version">
         <span>PHP</span>
         <select id="phpSelect"></select>
       </label>
@@ -34,31 +34,31 @@
       <button class="btn" data-act="term">⌨️ Terminal</button>
       <button class="btn" data-act="www">📁 www</button>
       <button class="btn" data-act="mail">✉️ Mailpit</button>
-      <button class="btn ghost" data-act="reload" title="Jana semula virtual host">↻ Muat Semula</button>
+      <button class="btn ghost" data-act="reload" title="Regenerate virtual hosts">↻ Reload</button>
     </section>
 
     <nav class="tabs">
-      <button class="tab active" data-tab="projects">Projek <span class="count" id="projCount"></span></button>
-      <button class="tab" data-tab="logs">Log</button>
-      <button class="tab" data-tab="settings">Tetapan</button>
+      <button class="tab active" data-tab="projects">Projects <span class="count" id="projCount"></span></button>
+      <button class="tab" data-tab="logs">Logs</button>
+      <button class="tab" data-tab="settings">Settings</button>
     </nav>
 
     <section class="panel" id="tab-projects">
       <form class="new-project" id="newProject">
-        <input id="npName" placeholder="nama-projek-baru" autocomplete="off" spellcheck="false"/>
+        <input id="npName" placeholder="new-project-name" autocomplete="off" spellcheck="false"/>
         <select id="npKind">
-          <option value="blank">PHP kosong</option>
+          <option value="blank">Blank PHP</option>
           <option value="laravel">Laravel</option>
         </select>
-        <button class="btn primary" type="submit">+ Cipta</button>
+        <button class="btn primary" type="submit">+ Create</button>
       </form>
       <div id="projects" class="projects"></div>
     </section>
 
     <section class="panel" id="tab-logs" hidden>
       <div class="log-tools">
-        <button class="btn small" data-folder="logs">Buka folder logs</button>
-        <button class="btn small ghost" id="clearLog">Kosongkan paparan</button>
+        <button class="btn small" data-folder="logs">Open logs folder</button>
+        <button class="btn small ghost" id="clearLog">Clear view</button>
       </div>
       <div id="logs" class="logs"></div>
     </section>
@@ -66,7 +66,7 @@
     <section class="panel" id="tab-settings" hidden>
       <form id="settings" class="settings">
         <fieldset>
-          <legend>Port</legend>
+          <legend>Ports</legend>
           <label>Apache <input type="number" name="apachePort" min="1" max="65535"/></label>
           <label>MySQL <input type="number" name="mysqlPort" min="1" max="65535"/></label>
           <label>Mailpit SMTP <input type="number" name="mailpitSmtpPort" min="1" max="65535"/></label>
@@ -74,30 +74,30 @@
         </fieldset>
         <fieldset>
           <legend>Virtual host</legend>
-          <label>Domain <span class="tld-wrap">nama-projek.<input name="tld" spellcheck="false"/></span></label>
-          <label class="check"><input type="checkbox" name="autoVhost"/> Auto virtual host untuk setiap folder dalam www</label>
+          <label>Domain <span class="tld-wrap">project-name.<input name="tld" spellcheck="false"/></span></label>
+          <label class="check"><input type="checkbox" name="autoVhost"/> Automatic virtual host for every folder in www</label>
         </fieldset>
         <fieldset>
           <legend>HTTPS (SSL)</legend>
-          <label class="check"><input type="checkbox" name="ssl"/> HTTPS untuk setiap projek (https://nama-projek.test)</label>
-          <label>Port HTTPS <input type="number" name="sslPort" min="1" max="65535"/></label>
+          <label class="check"><input type="checkbox" name="ssl"/> HTTPS for every project (https://project-name.test)</label>
+          <label>HTTPS port <input type="number" name="sslPort" min="1" max="65535"/></label>
           <div class="ssl-status">
             <span id="sslStatus" class="muted-text"></span>
             <div class="ssl-btns">
-              <button type="button" class="btn small" id="btnTrust">Percayai sijil</button>
-              <button type="button" class="btn small ghost" data-folder="ssl">Folder sijil</button>
+              <button type="button" class="btn small" id="btnTrust">Trust certificate</button>
+              <button type="button" class="btn small ghost" data-folder="ssl">Certificate folder</button>
             </div>
           </div>
         </fieldset>
         <fieldset>
-          <legend>Umum</legend>
-          <label class="check"><input type="checkbox" name="startAllOnLaunch"/> Mula semua servis bila LokalKit dibuka</label>
-          <label class="check"><input type="checkbox" name="minimizeToTray"/> Butang tutup (X) sembunyikan LokalKit ke system tray</label>
-          <label class="check"><input type="checkbox" name="stopAllOnExit"/> Henti semua servis bila keluar LokalKit</label>
+          <legend>General</legend>
+          <label class="check"><input type="checkbox" name="startAllOnLaunch"/> Start all services when LokalKit opens</label>
+          <label class="check"><input type="checkbox" name="minimizeToTray"/> Close button (X) hides LokalKit to the system tray</label>
+          <label class="check"><input type="checkbox" name="stopAllOnExit"/> Stop all services when quitting LokalKit</label>
         </fieldset>
         <div class="settings-foot">
           <span class="muted" id="rootPath"></span>
-          <button class="btn primary" type="submit">Simpan</button>
+          <button class="btn primary" type="submit">Save</button>
         </div>
       </form>
     </section>

@@ -164,25 +164,25 @@ func EnsureServerCert(dir string, ca *x509.Certificate, caKey crypto.Signer, nam
 func (m *Manager) prepareSSL(apacheDir string) (*SSLFiles, error) {
 	cfg := m.config()
 	if !exists(filepath.Join(apacheDir, "modules", "mod_ssl.so")) {
-		return nil, errors.New("mod_ssl.so tiada dalam Apache")
+		return nil, errors.New("mod_ssl.so is missing from Apache")
 	}
 	if !waitPortFree(cfg.SSLPort, 8*time.Second) {
-		return nil, fmt.Errorf("port %d sedang digunakan (Skype/VMware/IIS?). Tukar port HTTPS dalam Tetapan", cfg.SSLPort)
+		return nil, fmt.Errorf("port %d is in use (Skype/VMware/IIS?). Change the HTTPS port in Settings", cfg.SSLPort)
 	}
 	dir := m.sslDir()
 	ca, caKey, created, err := EnsureCA(dir)
 	if err != nil {
-		return nil, fmt.Errorf("gagal cipta CA: %w", err)
+		return nil, fmt.Errorf("failed to create CA: %w", err)
 	}
 	if created {
-		m.Logf("info", "CA LokalKit dicipta: %s", filepath.Join(dir, caFile))
+		m.Logf("info", "LokalKit CA created: %s", filepath.Join(dir, caFile))
 	}
 	changed, err := EnsureServerCert(dir, ca, caKey, ServerNames(m.hostNames()))
 	if err != nil {
-		return nil, fmt.Errorf("gagal cipta sijil: %w", err)
+		return nil, fmt.Errorf("failed to create certificate: %w", err)
 	}
 	if changed {
-		m.Logf("info", "Sijil HTTPS dijana untuk %d projek", len(m.hostNames()))
+		m.Logf("info", "HTTPS certificate issued for %d project(s)", len(m.hostNames()))
 	}
 	if !m.trustAsked {
 		m.trustAsked = true
@@ -195,7 +195,7 @@ func (m *Manager) trustIfNeeded() {
 	if runtime.GOOS != "windows" || m.CATrusted() {
 		return
 	}
-	m.Logf("info", "Windows akan minta pengesahan untuk percayai sijil LokalKit. Tekan \"Yes\" supaya https:// tiada amaran.")
+	m.Logf("info", "Windows will ask you to trust the LokalKit certificate. Click \"Yes\" so https:// shows no warnings.")
 	if err := m.TrustCA(); err != nil {
 		m.Logf("error", "%v", err)
 	}
@@ -205,7 +205,7 @@ func (m *Manager) trustIfNeeded() {
 // Windows shows its own confirmation dialog; no admin rights are needed.
 func (m *Manager) TrustCA() error {
 	if runtime.GOOS != "windows" {
-		return errors.New("percayai sijil automatik hanya untuk Windows")
+		return errors.New("automatic certificate trust is only available on Windows")
 	}
 	if _, _, _, err := EnsureCA(m.sslDir()); err != nil {
 		return err
@@ -215,12 +215,12 @@ func (m *Manager) TrustCA() error {
 	cmd := exec.CommandContext(ctx, "certutil", "-user", "-addstore", "Root", filepath.Join(m.sslDir(), caFile))
 	hideWindow(cmd)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("sijil tidak dipercayai (dibatalkan?): %s", lastLines(string(out), 2))
+		return fmt.Errorf("certificate not trusted (cancelled?): %s", lastLines(string(out), 2))
 	}
 	if !m.CATrusted() {
-		return errors.New("sijil belum dipercayai. Cuba lagi dari Tetapan → Percayai sijil")
+		return errors.New("certificate is not trusted yet. Try again from Settings → Trust certificate")
 	}
-	m.Logf("ok", "Sijil LokalKit dipercayai oleh Windows. Mulakan semula pelayar jika perlu.")
+	m.Logf("ok", "Windows now trusts the LokalKit certificate. Restart your browser if needed.")
 	m.emitServices()
 	return nil
 }
@@ -259,7 +259,7 @@ func readCert(path string) (*x509.Certificate, error) {
 	}
 	blk, _ := pem.Decode(b)
 	if blk == nil {
-		return nil, errors.New("bukan PEM")
+		return nil, errors.New("not PEM")
 	}
 	return x509.ParseCertificate(blk.Bytes)
 }
@@ -271,7 +271,7 @@ func readKey(path string) (crypto.Signer, error) {
 	}
 	blk, _ := pem.Decode(b)
 	if blk == nil {
-		return nil, errors.New("bukan PEM")
+		return nil, errors.New("not PEM")
 	}
 	k, err := x509.ParsePKCS8PrivateKey(blk.Bytes)
 	if err != nil {
@@ -279,7 +279,7 @@ func readKey(path string) (crypto.Signer, error) {
 	}
 	s, ok := k.(crypto.Signer)
 	if !ok {
-		return nil, errors.New("kunci tidak disokong")
+		return nil, errors.New("unsupported key")
 	}
 	return s, nil
 }

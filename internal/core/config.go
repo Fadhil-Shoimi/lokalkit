@@ -44,10 +44,10 @@ var tldRe = regexp.MustCompile(`^[a-z][a-z0-9-]{0,20}$`)
 
 // Real TLDs that would break normal browsing, plus ones browsers force to HTTPS.
 var blockedTLDs = map[string]string{
-	"com": "domain sebenar", "net": "domain sebenar", "org": "domain sebenar",
-	"my": "domain sebenar", "io": "domain sebenar",
-	"dev": "pelayar paksa HTTPS (HSTS)", "app": "pelayar paksa HTTPS (HSTS)",
-	"localhost": "dikhaskan",
+	"com": "a real domain", "net": "a real domain", "org": "a real domain",
+	"my": "a real domain", "io": "a real domain",
+	"dev": "browsers force HTTPS (HSTS)", "app": "browsers force HTTPS (HSTS)",
+	"localhost": "reserved",
 }
 
 func (c Config) Validate() error {
@@ -61,18 +61,18 @@ func (c Config) Validate() error {
 	seen := map[int]string{}
 	for name, p := range ports {
 		if p < 1 || p > 65535 {
-			return fmt.Errorf("port %s tidak sah: %d", name, p)
+			return fmt.Errorf("invalid %s port: %d", name, p)
 		}
 		if other, ok := seen[p]; ok {
-			return fmt.Errorf("port %d digunakan oleh %s dan %s", p, other, name)
+			return fmt.Errorf("port %d is used by both %s and %s", p, other, name)
 		}
 		seen[p] = name
 	}
 	if !tldRe.MatchString(c.TLD) {
-		return errors.New("TLD mesti huruf kecil, contoh: test")
+		return errors.New("the TLD must be lowercase letters, e.g. test")
 	}
 	if why, bad := blockedTLDs[c.TLD]; bad {
-		return fmt.Errorf("TLD .%s tidak boleh digunakan (%s). Cadangan: .test", c.TLD, why)
+		return fmt.Errorf("the .%s TLD cannot be used (%s). Suggestion: .test", c.TLD, why)
 	}
 	return nil
 }
@@ -87,7 +87,7 @@ func LoadConfig(path string) (Config, error) {
 		return cfg, err
 	}
 	if err := json.Unmarshal(b, &cfg); err != nil {
-		return DefaultConfig(), fmt.Errorf("lokalkit.json rosak: %w", err)
+		return DefaultConfig(), fmt.Errorf("lokalkit.json is corrupted: %w", err)
 	}
 	if err := cfg.Validate(); err != nil {
 		return DefaultConfig(), fmt.Errorf("lokalkit.json: %w", err)

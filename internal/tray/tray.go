@@ -24,7 +24,7 @@ type Summary struct {
 	Total    int
 	AnyBusy  bool
 	Tooltip  string
-	StopMode bool // the "all" item should say "Henti Semua"
+	StopMode bool // the "all" item should say "Stop All"
 }
 
 // Summarize computes the tooltip and state shown by the tray.
@@ -45,13 +45,13 @@ func Summarize(services []core.ServiceInfo) Summary {
 	s.StopMode = s.Running > 0
 	switch {
 	case s.Total == 0:
-		s.Tooltip = "LokalKit: tiada servis dipasang"
+		s.Tooltip = "LokalKit: no services installed"
 	case s.Running == 0:
-		s.Tooltip = "LokalKit: semua servis berhenti"
+		s.Tooltip = "LokalKit: all services stopped"
 	case s.Running == s.Total:
-		s.Tooltip = "LokalKit: semua servis berjalan"
+		s.Tooltip = "LokalKit: all services running"
 	default:
-		s.Tooltip = "LokalKit: " + itoa(s.Running) + "/" + itoa(s.Total) + " servis berjalan"
+		s.Tooltip = "LokalKit: " + itoa(s.Running) + "/" + itoa(s.Total) + " services running"
 	}
 	return s
 }
