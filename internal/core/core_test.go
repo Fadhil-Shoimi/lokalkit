@@ -365,10 +365,25 @@ func TestFixExtensionDir(t *testing.T) {
 }
 
 func TestDBeaverArgs(t *testing.T) {
-	args := DBeaverArgs(3307)
+	args := DBeaverArgs(3307, false)
 	if len(args) != 3 || args[1] != "-con" || !strings.Contains(args[2], "port=3307") ||
-		!strings.Contains(args[2], "driver=mysql") || !strings.Contains(args[2], "id=lokalkit-mysql") {
-		t.Errorf("%q", args)
+		!strings.Contains(args[2], "driver=mysql") || !strings.Contains(args[2], "save=true") {
+		t.Errorf("create: %q", args)
+	}
+	reuse := DBeaverArgs(3307, true)
+	if !strings.Contains(reuse[2], "create=false") || strings.Contains(reuse[2], "save=true") {
+		t.Errorf("reuse: %q", reuse)
+	}
+	appdata := t.TempDir()
+	t.Setenv("APPDATA", appdata)
+	if dbeaverHasConnection() {
+		t.Fatal("no DBeaver settings yet")
+	}
+	dir := filepath.Join(appdata, "DBeaverData", "workspace6", "General", ".dbeaver")
+	os.MkdirAll(dir, 0o755)
+	os.WriteFile(filepath.Join(dir, "data-sources.json"), []byte(`{"connections":{"lokalkit-mysql":{"name":"LokalKit MySQL"}}}`), 0o644)
+	if !dbeaverHasConnection() {
+		t.Fatal("saved connection not found")
 	}
 }
 

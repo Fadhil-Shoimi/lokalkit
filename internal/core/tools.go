@@ -107,7 +107,7 @@ func (m *Manager) OpenDatabase() (url string, err error) {
 		}
 	}
 	if dbeaver := findUnder(filepath.Join(m.P.Bin, "dbeaver"), exeName("dbeaver")); dbeaver != "" {
-		cmd := exec.Command(dbeaver, DBeaverArgs(m.config().MySQLPort)...)
+		cmd := exec.Command(dbeaver, DBeaverArgs(m.config().MySQLPort, dbeaverHasConnection())...)
 		cmd.Dir = filepath.Dir(dbeaver)
 		if err := cmd.Start(); err != nil {
 			return "", err
@@ -131,12 +131,16 @@ func (m *Manager) OpenDatabase() (url string, err error) {
 	return "", errors.New("no database tool found. Install DBeaver or Adminer from the Install tab")
 }
 
-// DBeaverArgs opens DBeaver with a saved "LokalKit MySQL" connection
-// (created on first use, reused afterwards) and connects to it.
-func DBeaverArgs(mysqlPort int) []string {
+// DBeaverArgs opens DBeaver connected to "LokalKit MySQL". The connection
+// is created the first time; afterwards the saved one is reused (asking to
+// create it again would add a duplicate to DBeaver's list).
+func DBeaverArgs(mysqlPort int, exists bool) []string {
+	if exists {
+		return []string{"-nosplash", "-con", "name=" + dbeaverConnName + "|create=false|connect=true"}
+	}
 	con := strings.Join([]string{
 		"id=lokalkit-mysql",
-		"name=LokalKit MySQL",
+		"name=" + dbeaverConnName,
 		"driver=mysql",
 		"host=127.0.0.1",
 		fmt.Sprintf("port=%d", mysqlPort),
@@ -149,6 +153,24 @@ func DBeaverArgs(mysqlPort int) []string {
 		"connect=true",
 	}, "|")
 	return []string{"-nosplash", "-con", con}
+}
+
+const dbeaverConnName = "LokalKit MySQL"
+
+// dbeaverHasConnection checks DBeaver's saved connections
+// (%APPDATA%\DBeaverData\workspace6\*\.dbeaver\data-sources*.json).
+func dbeaverHasConnection() bool {
+	base := os.Getenv("APPDATA")
+	if base == "" {
+		return false
+	}
+	files, _ := filepath.Glob(filepath.Join(base, "DBeaverData", "workspace6", "*", ".dbeaver", "data-sources*.json"))
+	for _, f := range files {
+		if b, err := os.ReadFile(f); err == nil && strings.Contains(string(b), `"`+dbeaverConnName+`"`) {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *Manager) adminerDir() string { return filepath.Join(m.P.Etc, "apps", "adminer") }
