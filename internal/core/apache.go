@@ -1,0 +1,174 @@
+package core
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"time"
+)
+
+type Apache struct {
+	m    *Manager
+	proc *Proc
+}
+
+func (a *Apache) ID() string { return "apache" }
+
+func (a *Apache) bin() string {
+	return findUnder(filepath.Join(a.m.P.Bin, "apache"), filepath.Join("bin", exeName("httpd")))
+}
+
+func (a *Apache) Info() ServiceInfo {
+	bin := a.bin()
+	cfg := a.m.config()
+	return ServiceInfo{
+		ID: "apache", Name: "Apache", Installed: bin != "",
+		Version: probeVersion(bin, "-v"), Running: a.proc.Running(),
+		Ports: fmt.Sprint(cfg.ApachePort), Hint: `bin\apache\<versi>\bin\httpd.exe`,
+	}
+}
+
+func (a *Apache) Running() bool { return a.proc.Running() }
+
+func (a *Apache) confPath() string { return filepath.Join(a.m.P.Etc, "apache", "httpd.conf") }
+
+func (a *Apache) Start() error {
+	if a.proc.Running() {
+		return nil
+	}
+	bin := a.bin()
+	if bin == "" {
+		return errors.New("Apache tidak dijumpai. Letak Apache dalam folder bin\\apache")
+	}
+	php, ok := a.m.CurrentPHP()
+	if !ok {
+		return errors.New("PHP tidak dijumpai. Letak PHP dalam folder bin\\php")
+	}
+	if php.ApacheDLL == "" {
+		return fmt.Errorf("PHP %s bukan versi Thread Safe (TS). Apache perlukan PHP TS", php.Version)
+	}
+	if err := a.m.EnsurePHPIni(php); err != nil {
+		return err
+	}
+	cfg := a.m.config()
+	if !PortFree(cfg.ApachePort) {
+		return fmt.Errorf("port %d sedang digunakan oleh program lain (Skype/IIS/Laragon lain?)", cfg.ApachePort)
+	}
+	if err := a.m.WriteVhosts(); err != nil {
+		return err
+	}
+	apacheDir := filepath.Dir(filepath.Dir(bin))
+	conf := BuildHttpdConf(HttpdParams{
+		ApacheDir: apacheDir, Paths: a.m.P, Port: cfg.ApachePort,
+		PHP: php, Modules: availableModules(apacheDir), Windows: runtime.GOOS == "windows",
+	})
+	if err := os.WriteFile(a.confPath(), []byte(conf), 0o644); err != nil {
+		return err
+	}
+	env := envWithPath([]string{php.Dir}, "PHPRC="+php.Dir)
+
+	// Test the config first so the user gets a clear error message.
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	test := exec.CommandContext(ctx, bin, "-t", "-f", a.confPath())
+	test.Dir, test.Env = apacheDir, env
+	hideWindow(test)
+	if out, err := test.CombinedOutput(); err != nil {
+		return fmt.Errorf("config Apache ada ralat: %s", strings.TrimSpace(string(out)))
+	}
+
+	if err := a.proc.Start(bin, []string{"-f", a.confPath()}, apacheDir, env,
+		filepath.Join(a.m.P.Logs, "apache_console.log")); err != nil {
+		return err
+	}
+	if err := waitPort(cfg.ApachePort, a.proc.Exited(), 15*time.Second); err != nil {
+		_ = a.proc.Stop(nil, 0)
+		return fmt.Errorf("Apache gagal dimulakan (%v). Lihat logs\\apache_error.log", err)
+	}
+	return nil
+}
+
+func (a *Apache) Stop() error { return a.proc.Stop(nil, 0) }
+
+var wantedModules = []string{
+	"access_compat", "actions", "alias", "allowmethods", "auth_basic", "authn_core",
+	"authn_file", "authz_core", "authz_groupfile", "authz_host", "authz_user",
+	"autoindex", "deflate", "dir", "env", "expires", "filter", "headers", "include",
+	"log_config", "mime", "negotiation", "proxy", "proxy_fcgi", "proxy_http",
+	"rewrite", "setenvif", "version",
+}
+
+func availableModules(apacheDir string) []string {
+	var out []string
+	for _, m := range wantedModules {
+		if exists(filepath.Join(apacheDir, "modules", "mod_"+m+".so")) {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+type HttpdParams struct {
+	ApacheDir string
+	Paths     Paths
+	Port      int
+	PHP       PHPInstall
+	Modules   []string
+	Windows   bool
+}
+
+func BuildHttpdConf(p HttpdParams) string {
+	var b strings.Builder
+	w := func(format string, args ...any) { fmt.Fprintf(&b, format+"\n", args...) }
+	www := slash(p.Paths.WWW)
+
+	w("# Dijana oleh LokalKit setiap kali Apache dimulakan. JANGAN edit fail ini.")
+	w("# Tetapan sendiri: etc/apache/custom.conf")
+	w(`ServerRoot "%s"`, slash(p.ApacheDir))
+	w(`Define LOKALKIT_ROOT "%s"`, slash(p.Paths.Root))
+	w("Listen %d", p.Port)
+	w("")
+	for _, m := range p.Modules {
+		w(`LoadModule %s_module modules/mod_%s.so`, m, m)
+	}
+	w("")
+	w("ServerName localhost:%d", p.Port)
+	w("ServerAdmin admin@localhost")
+	w(`DocumentRoot "%s"`, www)
+	w("<Directory />\n    AllowOverride None\n    Require all denied\n</Directory>")
+	w("<Directory \"%s\">\n    Options Indexes FollowSymLinks\n    AllowOverride All\n    Require all granted\n</Directory>", www)
+	w("DirectoryIndex index.php index.html index.htm")
+	w("<Files \".ht*\">\n    Require all denied\n</Files>")
+	w("")
+	w(`ErrorLog "%s/apache_error.log"`, slash(p.Paths.Logs))
+	w("LogLevel warn")
+	w("<IfModule log_config_module>")
+	w(`    LogFormat "%%h %%l %%u %%t \"%%r\" %%>s %%b" common`)
+	w(`    CustomLog "%s/apache_access.log" common`, slash(p.Paths.Logs))
+	w("</IfModule>")
+	w("TypesConfig conf/mime.types")
+	w("AddType application/x-compress .Z")
+	w("AddType application/x-gzip .gz .tgz")
+	w(`PidFile "%s/httpd.pid"`, slash(p.Paths.Tmp))
+	if p.Windows {
+		w("AcceptFilter http none")
+		w("AcceptFilter https none")
+		w("EnableSendfile Off")
+		w("EnableMMAP Off")
+		w("ThreadsPerChild 150")
+	}
+	w("")
+	w("# PHP %s", p.PHP.Version)
+	w(`LoadModule %s "%s"`, p.PHP.Module, slash(p.PHP.ApacheDLL))
+	w(`PHPIniDir "%s"`, slash(p.PHP.Dir))
+	w("<FilesMatch \"\\.php$\">\n    SetHandler application/x-httpd-php\n</FilesMatch>")
+	w("")
+	w(`IncludeOptional "%s/apache/sites-enabled/*.conf"`, slash(p.Paths.Etc))
+	w(`IncludeOptional "%s/apache/custom.conf"`, slash(p.Paths.Etc))
+	return b.String()
+}

@@ -1,0 +1,14 @@
+build/bin/
+frontend/node_modules/
+frontend/dist/*
+!frontend/dist/gitkeep
+frontend/package.json.md5
+# Folder runtime bila diuji dari folder projek
+/bin/
+/etc/
+/www/
+/data/
+/logs/
+/tmp/
+lokalkit.json
+frontend/wailsjs/

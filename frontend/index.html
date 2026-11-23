@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>LokalKit</title>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="var(--accent)"/>
+        <path d="M10 8v16h12" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M17 12l5 4-5 4" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/>
+      </svg>
+      <div>
+        <div class="name">LokalKit</div>
+        <div class="by">by Codeslab</div>
+      </div>
+    </div>
+    <div class="top-right">
+      <label class="php-pick" title="Versi PHP">
+        <span>PHP</span>
+        <select id="phpSelect"></select>
+      </label>
+      <span class="ver" id="appVersion"></span>
+    </div>
+  </header>
+
+  <main>
+    <div id="fatal" class="fatal" hidden></div>
+
+    <section class="services" id="services"></section>
+
+    <section class="actions">
+      <button class="btn primary" id="btnAll"></button>
+      <button class="btn" data-act="web">🌐 Web</button>
+      <button class="btn" data-act="db">🗄️ Database</button>
+      <button class="btn" data-act="term">⌨️ Terminal</button>
+      <button class="btn" data-act="www">📁 www</button>
+      <button class="btn" data-act="mail">✉️ Mailpit</button>
+      <button class="btn ghost" data-act="reload" title="Jana semula virtual host">↻ Muat Semula</button>
+    </section>
+
+    <nav class="tabs">
+      <button class="tab active" data-tab="projects">Projek <span class="count" id="projCount"></span></button>
+      <button class="tab" data-tab="logs">Log</button>
+      <button class="tab" data-tab="settings">Tetapan</button>
+    </nav>
+
+    <section class="panel" id="tab-projects">
+      <form class="new-project" id="newProject">
+        <input id="npName" placeholder="nama-projek-baru" autocomplete="off" spellcheck="false"/>
+        <select id="npKind">
+          <option value="blank">PHP kosong</option>
+          <option value="laravel">Laravel</option>
+        </select>
+        <button class="btn primary" type="submit">+ Cipta</button>
+      </form>
+      <div id="projects" class="projects"></div>
+    </section>
+
+    <section class="panel" id="tab-logs" hidden>
+      <div class="log-tools">
+        <button class="btn small" data-folder="logs">Buka folder logs</button>
+        <button class="btn small ghost" id="clearLog">Kosongkan paparan</button>
+      </div>
+      <div id="logs" class="logs"></div>
+    </section>
+
+    <section class="panel" id="tab-settings" hidden>
+      <form id="settings" class="settings">
+        <fieldset>
+          <legend>Port</legend>
+          <label>Apache <input type="number" name="apachePort" min="1" max="65535"/></label>
+          <label>MySQL <input type="number" name="mysqlPort" min="1" max="65535"/></label>
+          <label>Mailpit SMTP <input type="number" name="mailpitSmtpPort" min="1" max="65535"/></label>
+          <label>Mailpit Web <input type="number" name="mailpitHttpPort" min="1" max="65535"/></label>
+        </fieldset>
+        <fieldset>
+          <legend>Virtual host</legend>
+          <label>Domain <span class="tld-wrap">nama-projek.<input name="tld" spellcheck="false"/></span></label>
+          <label class="check"><input type="checkbox" name="autoVhost"/> Auto virtual host untuk setiap folder dalam www</label>
+        </fieldset>
+        <fieldset>
+          <legend>Umum</legend>
+          <label class="check"><input type="checkbox" name="startAllOnLaunch"/> Mula semua servis bila LokalKit dibuka</label>
+          <label class="check"><input type="checkbox" name="stopAllOnExit"/> Henti semua servis bila LokalKit ditutup</label>
+        </fieldset>
+        <div class="settings-foot">
+          <span class="muted" id="rootPath"></span>
+          <button class="btn primary" type="submit">Simpan</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="./src/main.js" type="module"></script>
+</body>
+</html>
