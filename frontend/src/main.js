@@ -110,6 +110,7 @@ function renderProjects(projects) {
           : p.error ? `<div class="proj-warn">⚠ Laravel setup failed: ${esc(p.error)} <button class="linkish" data-repair="${esc(p.name)}">Retry</button></div>`
           : p.needsAssets && !p.needsDeps ? `<div class="proj-warn">⚠ The front-end is not built yet (needs Node.js). <button class="linkish" data-repair="${esc(p.name)}">Build now</button></div>`
           : p.needsDeps ? `<div class="proj-warn">⚠ Composer packages are missing (vendor folder), so the app can't run. <button class="linkish" data-repair="${esc(p.name)}">Repair</button></div>` : ''}
+        ${(state.missingDbs || []).filter((d) => d.project === p.name).map((d) => `<div class="proj-warn">⚠ Database <code>${esc(d.database)}</code> (from .env) doesn't exist in MySQL. <button class="linkish" data-createdb="${esc(p.name)}">Create it${d.laravel ? ' + migrate' : ''}</button></div>`).join('')}
         ${(state.missingHosts || []).includes(p.host) ? `<div class="proj-warn">⚠ Not in the Windows hosts file yet, so browsers can't find it. <button class="linkish" data-fixhosts="1">Fix now</button> or <button class="linkish" data-uselocalhost="1">use .localhost instead</button> (works without the hosts file)</div>` : ''}
       </div>
       <div class="proj-btns">
@@ -248,6 +249,7 @@ function showTab(name) {
   document.querySelectorAll('.panel').forEach((p) => (p.hidden = p.id !== 'tab-' + name));
   if (name === 'logs') $('#logs').scrollTop = $('#logs').scrollHeight;
   if (name === 'install') loadComponents();
+  if (name === 'databases') loadDatabases();
 }
 
 // ---------- installer ----------
@@ -336,6 +338,16 @@ document.addEventListener('click', (ev) => {
       renderProjects(state.projects);
       if (!state.missingHosts.length) toast('Hosts file updated. Reload the page in your browser.');
     }, t);
+  } else if (t.dataset.createdb) {
+    run(async () => { await api.CreateProjectDatabase(t.dataset.createdb); await refreshProjects(); if (!$('#tab-databases').hidden) loadDatabases(); toast('Database created'); }, t);
+  } else if (t.dataset.dbExport) {
+    run(async () => { const path = await api.ExportDatabase(t.dataset.dbExport); toast(`Backup saved: ${path}`); }, t);
+  } else if (t.dataset.dbImport) {
+    run(async () => { if (await api.ImportSQLFile(t.dataset.dbImport)) { toast(`Imported into ${t.dataset.dbImport}`); loadDatabases(); } }, t);
+  } else if (t.dataset.dbDrop) {
+    const n = t.dataset.dbDrop;
+    if (!confirm(`Delete the database "${n}" and ALL its tables?\n\nThis cannot be undone. Tip: click Export first to keep a backup.`)) return;
+    run(async () => { await api.DropDatabase(n); toast(`Deleted ${n}`); loadDatabases(); refreshProjects(); }, t);
   } else if (t.dataset.unlink) {
     if (!confirm(`Remove ${t.dataset.unlink} from LokalKit?\n\nIts files are NOT deleted; they stay in their folder.`)) return;
     run(async () => { await api.UnlinkProject(t.dataset.unlink); await refreshProjects(); toast('Removed from LokalKit'); }, t);
@@ -374,6 +386,7 @@ async function refreshProjects() {
   const s = await api.GetState();
   state.projects = s.projects;
   state.missingHosts = s.missingHosts;
+  state.missingDbs = s.missingDbs;
   renderProjects(s.projects);
 }
 
@@ -491,6 +504,51 @@ $('#btnInstall').addEventListener('click', async () => {
 
 $('#btnCancelInstall').addEventListener('click', () => api.CancelInstall());
 
+// ---------- databases tab ----------
+
+async function loadDatabases() {
+  const v = await api.GetDatabases();
+  $('#dbPort').textContent = state.config?.mysqlPort || 3306;
+  $('#dbStopped').hidden = v.running;
+  $('#dbBody').hidden = !v.running;
+  $('#btnDbStart').hidden = !v.installed;
+  $('#dbStoppedHint').textContent = v.installed ? 'Start it to see and manage your databases.' : 'Install MySQL from the Install tab first.';
+  if (!v.running) return;
+  const dbs = v.databases || [];
+  $('#dbCount').textContent = dbs.length;
+  const missing = v.missing || [];
+  $('#dbMissing').innerHTML = missing.length ? `<div class="card db-missing">
+      <b>Projects pointing to a database that doesn't exist</b>
+      ${missing.map((d) => `<div class="db-missing-row"><span><b>${esc(d.project)}</b> expects <code>${esc(d.database)}</code></span>
+        <button class="btn small primary" data-createdb="${esc(d.project)}">${icon('plus')}Create${d.laravel ? ' + migrate' : ''}</button></div>`).join('')}
+      <div class="muted-text">Have it in Laragon? Use Projects → Import existing… → Databases to copy it with its data.</div>
+    </div>` : '';
+  $('#dbList2').innerHTML = dbs.length ? dbs.map((d) => `
+    <div class="card proj">
+      <div class="proj-icon db">${icon('database')}</div>
+      <div class="proj-main">
+        <div class="proj-name"><span class="db-name">${esc(d.name)}</span>${(d.projects || []).map((p) => `<span class="badge">${esc(p)}</span>`).join('')}</div>
+        <div class="db-meta">${d.tables} table${d.tables === 1 ? '' : 's'} · ${d.sizeMb < 0.1 ? '< 0.1' : d.sizeMb} MB${d.projects?.length ? '' : ' · not used by a project'}</div>
+      </div>
+      <div class="proj-btns">
+        <button class="btn small" data-db-export="${esc(d.name)}" title="Save a .sql backup">${icon('download')}Export</button>
+        <button class="btn small" data-db-import="${esc(d.name)}" title="Run a .sql file into this database">${icon('import')}Import .sql</button>
+        <button class="btn small danger-ghost" data-db-drop="${esc(d.name)}" title="Delete this database">${icon('x')}Delete</button>
+      </div>
+    </div>`).join('') : '<div class="empty">No databases yet. Create one above.</div>';
+}
+
+$('#btnDbStart').addEventListener('click', (ev) => run(async () => { await api.StartService('mysql'); await loadDatabases(); refreshProjects(); }, ev.currentTarget));
+
+$('#newDb').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const name = $('#ndbName').value.trim();
+  if (!name) return $('#ndbName').focus();
+  const ok = await run(async () => { await api.CreateDatabase(name); return true; }, ev.submitter);
+  if (ok) { $('#ndbName').value = ''; toast(`Database ${name} created`); loadDatabases(); }
+});
+$('#ndbName').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/[^A-Za-z0-9_]/g, '_'); });
+
 // ---------- import existing projects ----------
 
 let impRoot = ''; // tool root (e.g. C:\laragon) when the folder is its www
@@ -567,7 +625,16 @@ on('install-progress', (p) => {
   }
 });
 
-on('services', (s) => { renderServices(s); renderProjects(state.projects || []); });
+on('services', (s) => {
+  const wasUp = state.services?.find((x) => x.id === 'mysql')?.running;
+  renderServices(s);
+  renderProjects(state.projects || []);
+  const nowUp = s.find((x) => x.id === 'mysql')?.running;
+  if (wasUp !== nowUp) {
+    refreshProjects();
+    if (!$('#tab-databases').hidden) loadDatabases();
+  }
+});
 on('log', addLog);
 
 refresh();

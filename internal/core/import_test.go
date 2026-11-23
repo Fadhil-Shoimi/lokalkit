@@ -221,4 +221,52 @@ func TestImportDatabasesIntegration(t *testing.T) {
 	if query("SHOW DATABASES LIKE 'shop_db'") != "shop_db" {
 		t.Error("Laravel database not created")
 	}
+
+	// 5) Databases tab: list, export, import into another name, missing, drop.
+	dbs2, err := m.ListDatabases()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var kedai DatabaseInfo
+	for _, d := range dbs2 {
+		if d.Name == "kedai-runcit" {
+			kedai = d
+		}
+	}
+	if kedai.Tables != 1 {
+		t.Fatalf("list: %+v", dbs2)
+	}
+	dump, err := m.ExportDatabase("kedai-runcit")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(dump); !strings.Contains(string(b), "CREATE TABLE `items`") || strings.Contains(string(b), "USE `kedai-runcit`") {
+		t.Errorf("dump should hold the table and no USE statement")
+	}
+	if err := m.ImportSQL("kedai_copy", dump); err != nil {
+		t.Fatal(err)
+	}
+	if query("SELECT COUNT(*) FROM kedai_copy.items") != "2" {
+		t.Error("import into a new name failed")
+	}
+	os.MkdirAll(filepath.Join(m.P.WWW, "legacy"), 0o755)
+	os.WriteFile(filepath.Join(m.P.WWW, "legacy", ".env"), []byte("DB_CONNECTION=mysql\nDB_HOST=127.0.0.1\nDB_DATABASE=legacy_db\n"), 0o644)
+	if miss := m.MissingDatabases(); len(miss) != 1 || miss[0].Database != "legacy_db" {
+		t.Fatalf("missing: %+v", miss)
+	}
+	if err := m.CreateProjectDatabase("legacy"); err != nil {
+		t.Fatal(err)
+	}
+	if len(m.MissingDatabases()) != 0 {
+		t.Error("database should exist now")
+	}
+	if err := m.DropDatabase("kedai_copy"); err != nil {
+		t.Fatal(err)
+	}
+	if query("SHOW DATABASES LIKE 'kedai_copy'") != "" {
+		t.Error("drop failed")
+	}
+	if m.DropDatabase("mysql") == nil {
+		t.Error("system database must not be dropped")
+	}
 }

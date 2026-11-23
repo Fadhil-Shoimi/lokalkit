@@ -273,17 +273,18 @@ func (a *App) CancelInstall() {
 }
 
 type State struct {
-	Version  string             `json:"version"`
-	Error    string             `json:"error"`
-	Paths    core.Paths         `json:"paths"`
-	Config   core.Config        `json:"config"`
-	Services []core.ServiceInfo `json:"services"`
-	PHP      []core.PHPInstall  `json:"php"`
-	Current  string             `json:"currentPhp"`
-	Projects []core.Project     `json:"projects"`
-	Logs     []core.LogEntry    `json:"logs"`
-	SSL      core.SSLStatus     `json:"ssl"`
-	Missing  []string           `json:"missingHosts"` // project hosts not in the hosts file
+	Version  string                 `json:"version"`
+	Error    string                 `json:"error"`
+	Paths    core.Paths             `json:"paths"`
+	Config   core.Config            `json:"config"`
+	Services []core.ServiceInfo     `json:"services"`
+	PHP      []core.PHPInstall      `json:"php"`
+	Current  string                 `json:"currentPhp"`
+	Projects []core.Project         `json:"projects"`
+	Logs     []core.LogEntry        `json:"logs"`
+	SSL      core.SSLStatus         `json:"ssl"`
+	Missing  []string               `json:"missingHosts"` // project hosts not in the hosts file
+	NoDB     []core.MissingDatabase `json:"missingDbs"`   // projects whose MySQL database doesn't exist
 }
 
 func (a *App) GetState() State {
@@ -301,6 +302,7 @@ func (a *App) GetState() State {
 	s.Logs = a.m.History()
 	s.SSL = a.m.SSLStatus()
 	s.Missing = a.m.MissingFromHosts()
+	s.NoDB = a.m.MissingDatabases()
 	return s
 }
 
@@ -385,6 +387,88 @@ func (a *App) confirmTrust() bool {
 	return err != nil || res == "Continue" || res == "Yes" || res == "Ok"
 }
 
+// ---------- Databases tab ----------
+
+type DatabasesView struct {
+	Running   bool                   `json:"running"`
+	Installed bool                   `json:"installed"`
+	Databases []core.DatabaseInfo    `json:"databases"`
+	Missing   []core.MissingDatabase `json:"missing"`
+	BackupDir string                 `json:"backupDir"`
+	Error     string                 `json:"error"`
+}
+
+func (a *App) GetDatabases() DatabasesView {
+	if a.m == nil {
+		return DatabasesView{}
+	}
+	v := DatabasesView{BackupDir: filepath.Join(a.m.P.Root, "backups")}
+	for _, s := range a.m.Services() {
+		if s.ID == "mysql" {
+			v.Running, v.Installed = s.Running, s.Installed
+		}
+	}
+	if !v.Running {
+		return v
+	}
+	dbs, err := a.m.ListDatabases()
+	if err != nil {
+		v.Error = err.Error()
+	}
+	v.Databases = dbs
+	v.Missing = a.m.MissingDatabases()
+	return v
+}
+
+func (a *App) CreateDatabase(name string) error {
+	if err := a.ready(); err != nil {
+		return err
+	}
+	return a.m.CreateMySQLDatabase(name)
+}
+
+func (a *App) CreateProjectDatabase(project string) error {
+	if err := a.ready(); err != nil {
+		return err
+	}
+	return a.m.CreateProjectDatabase(project)
+}
+
+// ExportDatabase saves a .sql backup and shows it in Explorer.
+func (a *App) ExportDatabase(name string) (string, error) {
+	if err := a.ready(); err != nil {
+		return "", err
+	}
+	path, err := a.m.ExportDatabase(name)
+	if err == nil {
+		_ = core.OpenPath(filepath.Dir(path))
+	}
+	return path, err
+}
+
+// ImportSQLFile asks for a .sql/.sql.gz file and imports it into name.
+// Returns false when the user cancelled the file dialog.
+func (a *App) ImportSQLFile(name string) (bool, error) {
+	if err := a.ready(); err != nil {
+		return false, err
+	}
+	file, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title:   "Choose a .sql file to import into " + name,
+		Filters: []runtime.FileFilter{{DisplayName: "SQL files (*.sql, *.sql.gz)", Pattern: "*.sql;*.sql.gz;*.gz"}},
+	})
+	if err != nil || file == "" {
+		return false, err
+	}
+	return true, a.m.ImportSQL(name, file)
+}
+
+func (a *App) DropDatabase(name string) error {
+	if err := a.ready(); err != nil {
+		return err
+	}
+	return a.m.DropDatabase(name)
+}
+
 // FixHosts adds every project to the Windows hosts file (asks for admin).
 func (a *App) FixHosts() ([]string, error) {
 	if err := a.ready(); err != nil {
@@ -466,7 +550,7 @@ func (a *App) OpenFolder(key string) error {
 		return err
 	}
 	p := a.m.P
-	paths := map[string]string{"root": p.Root, "www": p.WWW, "bin": p.Bin, "logs": p.Logs, "etc": p.Etc, "ssl": a.m.SSLStatus().Dir}
+	paths := map[string]string{"root": p.Root, "www": p.WWW, "bin": p.Bin, "logs": p.Logs, "etc": p.Etc, "ssl": a.m.SSLStatus().Dir, "backups": filepath.Join(p.Root, "backups")}
 	if dir, ok := paths[key]; ok {
 		return core.OpenPath(dir)
 	}

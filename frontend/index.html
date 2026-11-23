@@ -48,6 +48,7 @@
 
     <nav class="tabs">
       <button class="tab active" data-tab="projects">Projects <span class="count" id="projCount"></span></button>
+      <button class="tab" data-tab="databases">Databases</button>
       <button class="tab" data-tab="logs">Logs</button>
       <button class="tab" data-tab="install">Install <span class="count warn" id="installCount" hidden></span></button>
       <button class="tab" data-tab="settings">Settings</button>
@@ -121,6 +122,30 @@
         </div>
       </div>
       <div id="projects" class="projects"></div>
+    </section>
+
+    <section class="panel" id="tab-databases" hidden>
+      <div class="card db-stopped" id="dbStopped" hidden>
+        <div><b>MySQL is not running</b><div class="muted-text" id="dbStoppedHint">Start it to see and manage your databases.</div></div>
+        <button class="btn primary small" id="btnDbStart" data-icon="play">Start MySQL</button>
+      </div>
+      <div id="dbBody">
+        <div class="card newproj">
+          <div class="newproj-title">New database</div>
+          <form class="np-row" id="newDb">
+            <input id="ndbName" class="field mono" placeholder="database_name" autocomplete="off" spellcheck="false"/>
+            <button class="btn primary" type="submit" data-icon="plus">Create</button>
+            <button class="btn" type="button" data-act="db" data-icon="database">Open DBeaver</button>
+          </form>
+          <div class="muted-text">MySQL 127.0.0.1:<span id="dbPort">3306</span> · user <code>root</code> · no password · utf8mb4</div>
+        </div>
+        <div id="dbMissing"></div>
+        <div class="list-head">
+          <h3>Databases <span class="count" id="dbCount"></span></h3>
+          <button class="btn small" type="button" data-folder="backups" data-icon="folder">Backups folder</button>
+        </div>
+        <div id="dbList2" class="projects"></div>
+      </div>
     </section>
 
     <section class="panel" id="tab-logs" hidden>

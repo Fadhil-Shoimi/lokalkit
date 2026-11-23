@@ -72,6 +72,13 @@ You can keep several PHP versions in `bin\php\` and pick one from the menu at th
 
 The first time Apache starts with projects, Windows asks for admin rights (UAC) to update the hosts file. This is expected.
 
+## Databases tab
+
+- Lists the databases in LokalKit's MySQL with their size, number of tables and the projects whose `.env` uses them
+- **Create** a database, **Export** a `.sql` backup (saved in `backups\`, restorable under any name), **Import .sql** (or `.sql.gz`) into a database, **Delete** a database
+- **Missing databases**: projects whose `.env` points at a database that doesn't exist are listed (and flagged on the project) with **Create** / **Create + migrate**
+- **Open DBeaver** with the ready "LokalKit MySQL" connection
+
 ## Importing projects from Laragon (or any folder)
 
 **Projects → Import…** finds `C:\laragon\www` automatically (or click **Browse…** for any folder).

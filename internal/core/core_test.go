@@ -449,3 +449,32 @@ func TestTerminalFiles(t *testing.T) {
 		t.Errorf("scheme: %v", f.Schemes[0])
 	}
 }
+
+func TestDatabaseHelpers(t *testing.T) {
+	rows := [][]string{{"shop", "3145728", "12"}, {"kedai-runcit", "0", "0"}, {"bad"}}
+	got := ParseDatabaseRows(rows, map[string][]string{"shop": {"zeta", "alpha"}})
+	if len(got) != 2 || got[0].SizeMB != 3 || got[0].Tables != 12 || strings.Join(got[0].Projects, ",") != "alpha,zeta" || got[1].Name != "kedai-runcit" {
+		t.Fatalf("%+v", got)
+	}
+	for _, bad := range []string{"mysql", "sys", "a`b", "a/b", ""} {
+		if checkDBName(bad) == nil {
+			t.Errorf("%q should be rejected", bad)
+		}
+	}
+	if checkDBName("kedai-runcit") != nil {
+		t.Error("existing names with - must be allowed")
+	}
+	m := newTestManager(t)
+	for name, env := range map[string]string{
+		"app":    "DB_CONNECTION=mysql\nDB_HOST=127.0.0.1\nDB_DATABASE=app_db\n",
+		"remote": "DB_CONNECTION=mysql\nDB_HOST=db.example.com\nDB_DATABASE=prod\n",
+		"lite":   "DB_CONNECTION=sqlite\n",
+	} {
+		os.MkdirAll(filepath.Join(m.P.WWW, name), 0o755)
+		os.WriteFile(filepath.Join(m.P.WWW, name, ".env"), []byte(env), 0o644)
+	}
+	uses, _ := m.projectDatabases()
+	if len(uses) != 1 || uses["app_db"][0] != "app" {
+		t.Errorf("uses: %v", uses)
+	}
+}
