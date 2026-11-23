@@ -74,7 +74,9 @@ The first time Apache starts with projects, Windows asks for admin rights (UAC) 
 
 ## Updates
 
-LokalKit checks GitHub Releases at start (every 12 hours at most) and shows a banner when a newer version exists. **Update & restart** downloads the new `LokalKit.exe`, verifies it against `LokalKit.exe.sha256`, swaps it in (the old one is kept as `LokalKit.old.exe` until the next start), restarts, and starts the services that were running. Turn it off in **Settings → LokalKit updates**.
+LokalKit checks GitHub Releases at start (every 12 hours at most) and shows a banner when a newer version exists; **Download** opens the release page. Quit LokalKit (tray → Quit) and replace `LokalKit.exe` with the new one. Turn the check off in **Settings → LokalKit updates**.
+
+> One-click self-updating (download, swap the exe, restart) is implemented in `internal/updater` but switched off: in an unsigned exe that pattern gets the download flagged by antivirus. It can be turned back on once builds are code-signed.
 
 Publishing a release: create a release with a tag such as `v0.2.0` on GitHub. The build workflow stamps that version into the app and attaches `LokalKit.exe` and `LokalKit.exe.sha256`. **The repository (or a separate releases repository set in `internal/updater/updater.go`) must be public** for LokalKit to see releases.
 

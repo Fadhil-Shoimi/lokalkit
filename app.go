@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -454,57 +452,10 @@ func (a *App) CheckForUpdate(force bool) UpdateInfo {
 	return info
 }
 
-// InstallUpdate downloads the new LokalKit.exe, swaps it in and restarts.
-// Services that were running are started again by the new version.
-func (a *App) InstallUpdate() error {
-	if err := a.ready(); err != nil {
-		return err
-	}
-	a.updMu.Lock()
-	rel := a.updRelease
-	if a.updBusy {
-		a.updMu.Unlock()
-		return fmt.Errorf("an update is already running")
-	}
-	a.updBusy = true
-	a.updMu.Unlock()
-	defer func() { a.updMu.Lock(); a.updBusy = false; a.updMu.Unlock() }()
-	if rel == nil || !updater.Newer(rel.Version, AppVersion) {
-		return fmt.Errorf("no update available")
-	}
-	exe, err := os.Executable()
-	if err != nil {
-		return err
-	}
-	tmp := filepath.Join(a.m.P.Tmp, "LokalKit-update.exe")
-	a.m.Logf("info", "Downloading LokalKit %s...", rel.Version)
-	err = updater.Download(context.Background(), rel, tmp, func(got, total int64) {
-		runtime.EventsEmit(a.ctx, "update-progress", map[string]int64{"received": got, "total": total})
-	})
-	if err != nil {
-		a.m.Logf("error", "Update download failed: %v", err)
-		return err
-	}
-	var running []string
-	for _, s := range a.m.Services() {
-		if s.Running {
-			running = append(running, s.ID)
-		}
-	}
-	if err := updater.Replace(exe, tmp); err != nil {
-		return err
-	}
-	a.m.Logf("info", "Restarting into LokalKit %s...", rel.Version)
-	_ = a.m.StopAll() // free the ports for the new version
-	cmd := exec.Command(exe, "--wait-pid", strconv.Itoa(os.Getpid()), "--resume", strings.Join(running, ","))
-	cmd.Dir = filepath.Dir(exe)
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("new version installed, but it could not be started (open LokalKit again): %w", err)
-	}
-	a.quitting = true
-	runtime.Quit(a.ctx)
-	return nil
-}
+// Self-updating (download + replace the running exe + restart) is turned
+// off for now: in an unsigned exe that pattern gets the download flagged by
+// antivirus. The banner opens the release page instead. The code for it is
+// kept in internal/updater (Download, Replace) for when builds are signed.
 
 // ---------- Databases tab ----------
 

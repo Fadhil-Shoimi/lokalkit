@@ -515,8 +515,7 @@ function showUpdate(info) {
   const b = $('#updateBanner');
   if (!info || !info.available) { b.hidden = true; return; }
   $('#ubTitle').textContent = `LokalKit ${info.latest} is available`;
-  $('#ubSub').textContent = `You have ${info.current}. Updating restarts LokalKit; running services start again by themselves.`;
-  $('#ubNotes').hidden = !info.pageUrl;
+  $('#ubSub').textContent = `You have ${info.current}. Download the new LokalKit.exe from the release page, quit LokalKit (tray → Quit) and replace the old file.`;
   b.hidden = false;
 }
 
@@ -529,24 +528,15 @@ function renderUpdateStatus(info) {
     : `Version ${info.current} · you have the latest version`;
 }
 
-$('#ubNotes').addEventListener('click', () => updateInfo?.pageUrl && api.OpenURL(updateInfo.pageUrl));
 $('#ubLater').addEventListener('click', () => ($('#updateBanner').hidden = true));
-$('#ubInstall').addEventListener('click', async (ev) => {
-  const btn = ev.currentTarget;
-  btn.textContent = 'Downloading…';
-  const ok = await run(async () => { await api.InstallUpdate(); return true; }, btn);
-  if (!ok) btn.textContent = 'Update & restart';
-  else btn.textContent = 'Restarting…';
-});
+// Opens the release page; download LokalKit.exe there and replace yours.
+$('#ubInstall').addEventListener('click', () => updateInfo?.pageUrl && api.OpenURL(updateInfo.pageUrl));
 $('#btnCheckUpdate').addEventListener('click', async (ev) => {
   const info = await run(() => api.CheckForUpdate(true), ev.currentTarget);
   if (info) { renderUpdateStatus(info); showUpdate(info); }
 });
 on('update-available', (info) => { showUpdate(info); renderUpdateStatus(info); });
-on('update-progress', (p) => {
-  const pct = p.total > 0 ? Math.round((p.received / p.total) * 100) : 0;
-  $('#ubInstall').textContent = pct >= 100 ? 'Installing…' : `Downloading ${pct}%`;
-});
+
 
 // ---------- databases tab ----------
 
