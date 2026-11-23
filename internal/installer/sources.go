@@ -31,6 +31,8 @@ type Sources struct {
 	ComposerSHA256  string   `json:"composerSha256Url"`
 	AdminerURL      string   `json:"adminerUrl"`
 	VCRedistURL     string   `json:"vcRedistUrl"`
+	NodeIndex       string   `json:"nodeIndex"`
+	NodeBase        string   `json:"nodeBase"`
 }
 
 // ManifestURL is where a newer Sources override is published.
@@ -53,6 +55,8 @@ func DefaultSources() Sources {
 		ComposerSHA256: "https://getcomposer.org/download/latest-stable/composer.phar.sha256",
 		AdminerURL:     "https://www.adminer.org/latest.php",
 		VCRedistURL:    "https://aka.ms/vs/17/release/vc_redist.x64.exe",
+		NodeIndex:      "https://nodejs.org/dist/index.json",
+		NodeBase:       "https://nodejs.org/dist/",
 	}
 }
 
@@ -124,6 +128,8 @@ func mergeSources(base, o Sources) Sources {
 	set(&base.ComposerSHA256, o.ComposerSHA256)
 	set(&base.AdminerURL, o.AdminerURL)
 	set(&base.VCRedistURL, o.VCRedistURL)
+	set(&base.NodeIndex, o.NodeIndex)
+	set(&base.NodeBase, o.NodeBase)
 	return base
 }
 
@@ -241,4 +247,47 @@ func ResolveComposer(ctx context.Context, s Sources) (Artifact, error) {
 
 func ResolveAdminer(_ context.Context, s Sources) (Artifact, error) {
 	return Artifact{Version: "latest", Kind: "file", Name: "index.php", URLs: []string{s.AdminerURL}}, nil
+}
+
+// ResolveNode picks the newest LTS Node.js with a Windows x64 zip from
+// nodejs.org/dist/index.json and its SHA-256 from SHASUMS256.txt.
+func ResolveNode(ctx context.Context, s Sources) (Artifact, error) {
+	b, err := get(ctx, s.NodeIndex)
+	if err != nil {
+		return Artifact{}, fmt.Errorf("cannot read Node.js releases: %w", err)
+	}
+	var rel []struct {
+		Version string          `json:"version"`
+		LTS     json.RawMessage `json:"lts"` // false or a codename
+		Files   []string        `json:"files"`
+	}
+	if err := json.Unmarshal(b, &rel); err != nil {
+		return Artifact{}, fmt.Errorf("unexpected Node.js releases format: %w", err)
+	}
+	for _, r := range rel {
+		if string(r.LTS) == "false" || len(r.LTS) == 0 {
+			continue
+		}
+		hasZip := false
+		for _, f := range r.Files {
+			if f == "win-x64-zip" {
+				hasZip = true
+			}
+		}
+		if !hasZip {
+			continue
+		}
+		name := "node-" + r.Version + "-win-x64"
+		dir := strings.TrimRight(s.NodeBase, "/") + "/" + r.Version + "/"
+		art := Artifact{Version: strings.TrimPrefix(r.Version, "v"), Kind: "zip", Name: name, URLs: []string{dir + name + ".zip"}}
+		if sums, err := get(ctx, dir+"SHASUMS256.txt"); err == nil {
+			for _, line := range strings.Split(string(sums), "\n") {
+				if f := strings.Fields(line); len(f) == 2 && f[1] == name+".zip" {
+					art.SHA256 = strings.ToLower(f[0])
+				}
+			}
+		}
+		return art, nil
+	}
+	return Artifact{}, fmt.Errorf("no Node.js LTS release with a Windows zip found")
 }

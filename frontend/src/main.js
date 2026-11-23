@@ -79,6 +79,7 @@ function renderProjects(projects) {
         </div>
         ${p.task ? `<div class="proj-task"><span class="spin"></span>${esc(p.task)}</div>`
           : p.error ? `<div class="proj-warn">⚠ Laravel setup failed: ${esc(p.error)} <button class="linkish" data-repair="${esc(p.name)}">Retry</button></div>`
+          : p.needsAssets && !p.needsDeps ? `<div class="proj-warn">⚠ The front-end is not built yet (needs Node.js). <button class="linkish" data-repair="${esc(p.name)}">Build now</button></div>`
           : p.needsDeps ? `<div class="proj-warn">⚠ Composer packages are missing (vendor folder), so the app can't run. <button class="linkish" data-repair="${esc(p.name)}">Repair</button></div>` : ''}
         ${(state.missingHosts || []).includes(p.host) ? `<div class="proj-warn">⚠ Not in the Windows hosts file yet, so browsers can't find it. <button class="linkish" data-fixhosts="1">Fix now</button> or <button class="linkish" data-uselocalhost="1">use .localhost instead</button> (works without the hosts file)</div>` : ''}
       </div>
@@ -278,7 +279,7 @@ $('#newProject').addEventListener('submit', async (ev) => {
   if (p) {
     $('#npName').value = '';
     await refreshProjects();
-    toast($('#npKind').value === 'laravel' ? `Installing Laravel into ${p.name}… this takes a few minutes` : `Project ${p.name} created → ${p.https || p.url || ''}`);
+    toast($('#npKind').value.startsWith('laravel') ? `Creating ${p.name} with the latest Laravel… this takes a few minutes` : `Project ${p.name} created → ${p.https || p.url || ''}`);
   }
 });
 

@@ -67,6 +67,7 @@ func New(root string, detect Detector, onProgress func(Progress)) *Installer {
 			"mailpit":  ResolveMailpit,
 			"composer": ResolveComposer,
 			"adminer":  ResolveAdminer,
+			"nodejs":   ResolveNode,
 			"vcredist": func(_ context.Context, s Sources) (Artifact, error) {
 				return Artifact{Version: "latest", Kind: "run", Name: "vc_redist.x64.exe", URLs: []string{s.VCRedistURL}}, nil
 			},
@@ -81,6 +82,7 @@ var catalog = []Component{
 	{ID: "mysql", Name: "MySQL", Description: "MySQL 8.4 LTS database (about 250 MB)", Recommended: true},
 	{ID: "mailpit", Name: "Mailpit", Description: "Catches emails sent by your apps", Recommended: true},
 	{ID: "composer", Name: "Composer", Description: "PHP package manager (needed for Laravel)", Recommended: true},
+	{ID: "nodejs", Name: "Node.js", Description: "JavaScript runtime (LTS), builds the front-end of Laravel starter kits", Recommended: true},
 	{ID: "adminer", Name: "Adminer", Description: "Database manager in the browser (http://localhost/adminer/)"},
 }
 
@@ -98,6 +100,8 @@ func (in *Installer) Components() []Component {
 			c.Installed = fileExists(filepath.Join(in.Root, "bin", "composer", "composer.phar"))
 		case "adminer":
 			c.Installed = fileExists(filepath.Join(in.Root, "etc", "apps", "adminer", "index.php"))
+		case "nodejs":
+			c.Installed, c.Version = nodeInstalled(in.Root)
 		default:
 			if in.Detect != nil {
 				c.Installed, c.Version = in.Detect(c.ID)
@@ -487,4 +491,24 @@ func safeName(s string) string {
 func fileExists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
+}
+
+// nodeInstalled looks for bin/nodejs/<folder>/node.exe.
+func nodeInstalled(root string) (bool, string) {
+	exe := "node"
+	if runtime.GOOS == "windows" {
+		exe = "node.exe"
+	}
+	matches, _ := filepath.Glob(filepath.Join(root, "bin", "nodejs", "*", exe))
+	deeper, _ := filepath.Glob(filepath.Join(root, "bin", "nodejs", "*", "*", exe))
+	matches = append(matches, deeper...)
+	if fileExists(filepath.Join(root, "bin", "nodejs", exe)) {
+		return true, ""
+	}
+	if len(matches) == 0 {
+		return false, ""
+	}
+	v := filepath.Base(filepath.Dir(matches[len(matches)-1]))
+	v = strings.TrimSuffix(strings.TrimPrefix(v, "node-v"), "-win-x64")
+	return true, v
 }

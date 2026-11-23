@@ -144,13 +144,14 @@ func (m *Manager) CreateProject(name, kind string) (Project, error) {
 		return Project{}, err
 	}
 	switch kind {
-	case "laravel":
+	case "laravel", "laravel-react", "laravel-vue", "laravel-livewire":
 		if !exists(filepath.Join(m.P.Bin, "composer", "composer.phar")) {
 			_ = os.Remove(dir)
 			return Project{}, errors.New("Composer not found. Install it from the Install tab")
 		}
+		m.tasks.rememberKit(name, kind)
 		// Runs in the background; progress shows on the project row.
-		go m.installLaravel(name, dir, true)
+		go m.installLaravel(name, dir, kind)
 	default:
 		page := fmt.Sprintf("<?php\n// Project %s, created by LokalKit\n?>\n<!doctype html>\n<html><head><meta charset=\"utf-8\"><title>%s</title></head>\n<body style=\"font-family:system-ui;padding:40px\">\n<h1>%s</h1>\n<p>PHP <?= PHP_VERSION ?> is running. Edit this file at <code><?= __FILE__ ?></code></p>\n</body></html>\n", name, name, name)
 		if err := os.WriteFile(filepath.Join(dir, "index.php"), []byte(page), 0o644); err != nil {

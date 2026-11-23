@@ -65,6 +65,14 @@ func fakeSites(t *testing.T) (*httptest.Server, Sources) {
 	mux.HandleFunc("/mailpit.zip", func(w http.ResponseWriter, r *http.Request) { w.Write(mailpitZip) })
 	mux.HandleFunc("/composer.phar", func(w http.ResponseWriter, r *http.Request) { w.Write(composer) })
 	mux.HandleFunc("/composer.phar.sha256", func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, sum(composer)) })
+	nodeZip := makeZip(t, map[string]string{"node-v26.13.1-win-x64/node.exe": "node", "node-v26.13.1-win-x64/node_modules/npm/bin/npm-cli.js": "//"})
+	mux.HandleFunc("/node/index.json", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `[{"version":"v27.0.0","lts":false,"files":["win-x64-zip"]},{"version":"v26.13.1","lts":"Lithium","files":["linux-x64","win-x64-zip"]}]`)
+	})
+	mux.HandleFunc("/node/v26.13.1/SHASUMS256.txt", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "aaaa  node-v26.13.1-linux-x64.tar.gz\n%s  node-v26.13.1-win-x64.zip\n", sum(nodeZip))
+	})
+	mux.HandleFunc("/node/v26.13.1/node-v26.13.1-win-x64.zip", func(w http.ResponseWriter, r *http.Request) { w.Write(nodeZip) })
 	mux.HandleFunc("/adminer.php", func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, "<?php // adminer") })
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -74,7 +82,7 @@ func fakeSites(t *testing.T) (*httptest.Server, Sources) {
 		ApacheIndex: u + "/apache/download/", ApacheBase: u,
 		MySQLVersion: "8.4.3", MySQLURLs: []string{u + "/mysql/broken.zip", u + "/mysql/mysql-8.4.3-winx64.zip"},
 		MailpitURL: u + "/mailpit.zip", ComposerURL: u + "/composer.phar", ComposerSHA256: u + "/composer.phar.sha256",
-		AdminerURL: u + "/adminer.php",
+		AdminerURL: u + "/adminer.php", NodeIndex: u + "/node/index.json", NodeBase: u + "/node/",
 	}
 }
 
@@ -106,7 +114,7 @@ func TestInstallEverything(t *testing.T) {
 		mu.Unlock()
 	})
 	in.sources = &s
-	if err := in.Install([]string{"adminer", "composer", "mailpit", "mysql", "php", "apache"}); err != nil {
+	if err := in.Install([]string{"adminer", "composer", "mailpit", "mysql", "php", "apache", "nodejs"}); err != nil {
 		t.Fatal(err)
 	}
 	for _, f := range []string{
@@ -116,6 +124,7 @@ func TestInstallEverything(t *testing.T) {
 		"bin/mailpit/mailpit/mailpit.exe",
 		"bin/composer/composer.phar",
 		"etc/apps/adminer/index.php",
+		"bin/nodejs/node-v26.13.1-win-x64/node-v26.13.1-win-x64/node_modules/npm/bin/npm-cli.js",
 	} {
 		if !fileExists(filepath.Join(root, filepath.FromSlash(f))) {
 			t.Errorf("missing %s", f)
@@ -196,4 +205,25 @@ func TestManifestOverride(t *testing.T) {
 	if d := LoadSources(context.Background(), "http://127.0.0.1:1/none"); d.PHPBranch != "8.3" {
 		t.Error("unreachable manifest should keep defaults")
 	}
+}
+
+func TestResolveNode(t *testing.T) {
+	_, s := fakeSites(t)
+	a, err := ResolveNode(context.Background(), s)
+	if err != nil || a.Version != "26.13.1" || a.SHA256 == "" || !strings.HasSuffix(a.URLs[0], "/node/v26.13.1/node-v26.13.1-win-x64.zip") {
+		t.Fatalf("%+v %v", a, err)
+	}
+}
+
+// TestResolveRealSources checks resolvers against the real websites.
+// Run with LOKALKIT_NET=1 (needs internet access).
+func TestResolveRealSources(t *testing.T) {
+	if os.Getenv("LOKALKIT_NET") == "" {
+		t.Skip("set LOKALKIT_NET=1")
+	}
+	a, err := ResolveNode(context.Background(), DefaultSources())
+	if err != nil || a.SHA256 == "" {
+		t.Fatalf("node: %+v %v", a, err)
+	}
+	t.Logf("node: %s %s", a.Version, a.URLs[0])
 }

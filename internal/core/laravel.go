@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -20,6 +21,7 @@ import (
 // the app knows when it finishes or fails and can finish the setup itself.
 
 type projectTasks struct {
+	kits   map[string]string // project name -> kit it was created with
 	mu     sync.Mutex
 	state  map[string]string // project name -> status text while busy
 	errors map[string]string // project name -> last setup error
@@ -36,6 +38,25 @@ func (t *projectTasks) setError(name, msg string) {
 	} else {
 		t.errors[name] = msg
 	}
+}
+
+func (t *projectTasks) rememberKit(name, kit string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.kits == nil {
+		t.kits = map[string]string{}
+	}
+	t.kits[name] = kit
+}
+
+// kitFor returns the kit a project was created with (default: plain Laravel).
+func (t *projectTasks) kitFor(name string) string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if k := t.kits[name]; k != "" {
+		return k
+	}
+	return "laravel"
 }
 
 func (t *projectTasks) getError(name string) string {
@@ -69,6 +90,7 @@ func (m *Manager) annotate(ps []Project) []Project {
 	for i := range ps {
 		ps[i].Task, _ = m.tasks.get(ps[i].Name)
 		ps[i].Error = m.tasks.getError(ps[i].Name)
+		ps[i].NeedsAssets = needsAssets(ps[i].Path)
 		ps[i].NeedsDeps = exists(filepath.Join(ps[i].Path, "composer.json")) &&
 			!exists(filepath.Join(ps[i].Path, "vendor", "autoload.php"))
 	}
@@ -174,51 +196,179 @@ func trimTo(s string, n int) string {
 	return s[:n-1] + "…"
 }
 
-// installLaravel runs "composer create-project" (fresh) or "composer install"
-// (repair), then prepares .env for LokalKit's MySQL and Mailpit.
-func (m *Manager) installLaravel(name, dir string, fresh bool) {
+// LaravelKits maps the "new project" choices to Composer packages. Starter
+// kits are taken from their main branch, like the official Laravel installer
+// does: their tagged releases lag far behind.
+var LaravelKits = map[string]struct{ Package, Version, Label string }{
+	"laravel":          {"laravel/laravel", "", "Laravel"},
+	"laravel-react":    {"laravel/react-starter-kit", "dev-main", "Laravel + React starter kit"},
+	"laravel-vue":      {"laravel/vue-starter-kit", "dev-main", "Laravel + Vue starter kit"},
+	"laravel-livewire": {"laravel/livewire-starter-kit", "dev-main", "Laravel + Livewire starter kit"},
+}
+
+// installLaravel creates a project from kit ("laravel", "laravel-react"...)
+// or, with kit == "", repairs an existing one. Then it runs the kit's own
+// post-create steps, prepares .env/MySQL/Mailpit and builds the front-end.
+func (m *Manager) installLaravel(name, dir, kit string) {
 	logFile := filepath.Join(m.P.Logs, "composer-"+name+".log")
 	finish := func(err error) {
 		m.tasks.set(name, "")
 		if err != nil {
 			m.tasks.setError(name, trimTo(err.Error(), 300))
-			m.Logf("error", "Laravel setup for %s failed: %v. Full output: %s", name, err, logFile)
+			m.Logf("error", "Setup for %s failed: %v. Full output: %s", name, err, logFile)
 		} else {
 			m.tasks.setError(name, "")
 		}
 		m.emit("projects", m.Projects())
-		if err == nil {
-			_ = m.Reload() // the document root is now public/
-		}
+		_ = m.Reload() // the document root is now public/
 	}
+	m.tasks.setError(name, "")
 	m.tasks.set(name, "Starting Composer…")
 	m.emit("projects", m.Projects())
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Minute)
 	defer cancel()
 
-	args := []string{"install", "--no-progress"}
-	if fresh {
-		m.Logf("info", "Installing Laravel into %s (this takes a few minutes)...", name)
-		args = []string{"create-project", "laravel/laravel", ".", "--prefer-dist", "--no-progress"}
-	} else {
+	var args []string
+	if kit != "" {
+		k, ok := LaravelKits[kit]
+		if !ok {
+			finish(fmt.Errorf("unknown project type %q", kit))
+			return
+		}
+		m.Logf("info", "Creating %s in %s (this takes a few minutes)...", k.Label, name)
+		args = []string{"create-project", k.Package, "."}
+		if k.Version != "" {
+			args = append(args, k.Version)
+		}
+		args = append(args, "--prefer-dist", "--no-progress")
+	} else if !exists(filepath.Join(dir, "vendor", "autoload.php")) {
 		m.Logf("info", "Installing Composer packages for %s...", name)
+		args = []string{"install", "--no-progress"}
 	}
-	cmd, err := m.composerCmd(ctx, dir, args...)
-	if err != nil {
-		finish(err)
-		return
+	if args != nil {
+		cmd, err := m.composerCmd(ctx, dir, args...)
+		if err != nil {
+			finish(err)
+			return
+		}
+		if err := m.runLogged(name, cmd, logFile); err != nil {
+			finish(err)
+			return
+		}
 	}
-	if err := m.runLogged(name, cmd, logFile); err != nil {
-		finish(err)
-		return
+	if kit != "" {
+		m.runInstallerSteps(ctx, name, dir, logFile)
 	}
 	if err := m.setupLaravelEnv(ctx, name, dir, logFile); err != nil {
 		finish(err)
 		return
 	}
+	if err := m.buildAssets(ctx, name, dir, logFile); err != nil {
+		finish(err)
+		return
+	}
 	finish(nil)
 	p := m.findProject(name)
-	m.Logf("ok", "Laravel is ready: %s", firstNonEmpty(p.HTTPS, p.URL))
+	m.Logf("ok", "Ready: %s", firstNonEmpty(p.HTTPS, p.URL))
+}
+
+// runInstallerSteps runs the commands a starter kit asks the Laravel
+// installer to run after creation (composer.json extra.laravel.installer
+// post-create-project), e.g. "@php artisan install:features".
+func (m *Manager) runInstallerSteps(ctx context.Context, name, dir, logFile string) {
+	b, err := os.ReadFile(filepath.Join(dir, "composer.json"))
+	if err != nil {
+		return
+	}
+	var cj struct {
+		Extra struct {
+			Laravel struct {
+				Installer struct {
+					PostCreate []string `json:"post-create-project"`
+				} `json:"installer"`
+			} `json:"laravel"`
+		} `json:"extra"`
+	}
+	if json.Unmarshal(b, &cj) != nil {
+		return
+	}
+	for _, step := range cj.Extra.Laravel.Installer.PostCreate {
+		f := strings.Fields(step)
+		if len(f) < 3 || f[0] != "@php" || f[1] != "artisan" {
+			m.Logf("info", "Skipped starter kit step %q (run it yourself in the Terminal if needed)", step)
+			continue
+		}
+		m.tasks.set(name, "Running "+strings.Join(f[1:], " ")+"…")
+		m.emit("projects", m.Projects())
+		args := append(f[2:], "--no-interaction")
+		cmd, err := m.artisanCmd(ctx, dir, args...)
+		if err == nil {
+			err = m.runLogged(name, cmd, logFile)
+		}
+		if err != nil {
+			m.Logf("error", "Starter kit step %q failed: %v", step, err)
+		}
+	}
+}
+
+// nodeBin returns bin/nodejs/.../node.exe when Node.js is installed.
+func (m *Manager) nodeBin() string {
+	return findUnder(filepath.Join(m.P.Bin, "nodejs"), exeName("node"))
+}
+
+func composerName(dir string) string {
+	b, err := os.ReadFile(filepath.Join(dir, "composer.json"))
+	if err != nil {
+		return ""
+	}
+	var cj struct {
+		Name string `json:"name"`
+	}
+	_ = json.Unmarshal(b, &cj)
+	return cj.Name
+}
+
+// needsAssets: a starter kit (any Vite app other than the plain Laravel
+// skeleton, whose welcome page works without a build) with no built assets.
+func needsAssets(dir string) bool {
+	if !exists(filepath.Join(dir, "package.json")) || !exists(filepath.Join(dir, "artisan")) {
+		return false
+	}
+	if exists(filepath.Join(dir, "public", "build", "manifest.json")) || exists(filepath.Join(dir, "public", "hot")) {
+		return false
+	}
+	return composerName(dir) != "laravel/laravel"
+}
+
+// buildAssets runs "npm install" and "npm run build" with LokalKit's Node.js.
+func (m *Manager) buildAssets(ctx context.Context, name, dir, logFile string) error {
+	if !exists(filepath.Join(dir, "package.json")) || exists(filepath.Join(dir, "public", "build", "manifest.json")) {
+		return nil
+	}
+	node := m.nodeBin()
+	if node == "" {
+		if needsAssets(dir) {
+			return errors.New("the front-end needs Node.js to build. Install Node.js from the Install tab, then click Retry")
+		}
+		m.Logf("info", "Tip: install Node.js from the Install tab to build %s's front-end (npm run build)", name)
+		return nil
+	}
+	npm := filepath.Join(filepath.Dir(node), "node_modules", "npm", "bin", "npm-cli.js")
+	if !exists(npm) {
+		return fmt.Errorf("npm not found next to %s; reinstall Node.js from the Install tab", node)
+	}
+	for _, step := range [][]string{{"install", "--no-audit", "--no-fund"}, {"run", "build"}} {
+		m.tasks.set(name, "npm "+strings.Join(step, " ")+"…")
+		m.emit("projects", m.Projects())
+		cmd := exec.CommandContext(ctx, node, append([]string{npm}, step...)...)
+		cmd.Dir = dir
+		cmd.Env = envWithPath(m.toolDirs(), "npm_config_update_notifier=false")
+		hideWindow(cmd)
+		if err := m.runLogged(name, cmd, logFile); err != nil {
+			return fmt.Errorf("npm %s failed: %w", step[0], err)
+		}
+	}
+	return nil
 }
 
 func (m *Manager) findProject(name string) Project {
@@ -354,7 +504,10 @@ func (m *Manager) RepairProject(name string) error {
 		return errors.New("this project is already being set up")
 	}
 	// An empty folder means "composer create-project" never got going: start over.
-	entries, _ := os.ReadDir(p.Path)
-	go m.installLaravel(name, p.Path, len(entries) == 0)
+	kit := ""
+	if entries, _ := os.ReadDir(p.Path); len(entries) == 0 {
+		kit = m.tasks.kitFor(name)
+	}
+	go m.installLaravel(name, p.Path, kit)
 	return nil
 }
