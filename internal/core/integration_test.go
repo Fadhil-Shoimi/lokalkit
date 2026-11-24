@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -138,6 +139,32 @@ func runApacheIntegration(t *testing.T, tld string) {
 				t.Errorf("blog https body: %q", body)
 			}
 		}
+	}
+
+	// An AdonisJS project: Apache proxies its domain to the Node dev server.
+	setupFakeNode(t, m)
+	t.Cleanup(m.stopAllDev)
+	nodeDir := filepath.Join(p.WWW, "node-app")
+	os.MkdirAll(filepath.Join(nodeDir, "node_modules"), 0o755)
+	os.WriteFile(filepath.Join(nodeDir, "ace.js"), []byte(fakeAce), 0o644)
+	os.WriteFile(filepath.Join(nodeDir, ".env"), []byte("PORT="+strconv.Itoa(freePort(t))+"\n"), 0o644)
+	if err := m.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.StartDev("node-app"); err != nil {
+		t.Fatal(err)
+	}
+	app := m.findProject("node-app")
+	// (The test Apache listens on random ports, so Host carries the port.)
+	if body := get(app.HTTPS); !strings.HasPrefix(body, "adonis ok host=node-app."+tld) || !strings.HasSuffix(body, "proto=https") {
+		t.Errorf("proxied https body: %q", body)
+	}
+	if body := get(app.URL); !strings.HasSuffix(body, "proto=http") {
+		t.Errorf("proxied http body: %q", body)
+	}
+	m.StopDev("node-app")
+	if body := get(app.HTTPS); !strings.Contains(body, "dev server is not running") {
+		t.Errorf("stopped server should show the LokalKit page, got: %q", body)
 	}
 }
 

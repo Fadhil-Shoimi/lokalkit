@@ -114,6 +114,11 @@ func (m *Manager) annotate(ps []Project) []Project {
 		ps[i].Error = m.tasks.getError(ps[i].Name)
 		ps[i].NeedsAssets = needsAssets(ps[i].Path)
 		ps[i].EnvURL, ps[i].EnvURLMismatch = envURLStatus(ps[i])
+		if ps[i].Kind == "adonis" {
+			ps[i].DevRunning = m.DevRunning(ps[i].Name)
+			ps[i].NeedsDeps = exists(filepath.Join(ps[i].Path, "package.json")) && !exists(filepath.Join(ps[i].Path, "node_modules"))
+			continue
+		}
 		ps[i].NeedsDeps = exists(filepath.Join(ps[i].Path, "composer.json")) &&
 			!exists(filepath.Join(ps[i].Path, "vendor", "autoload.php"))
 	}
@@ -587,6 +592,13 @@ func (m *Manager) RepairProject(name string) error {
 	kit := ""
 	if entries, _ := os.ReadDir(p.Path); len(entries) == 0 {
 		kit = m.tasks.kitFor(name)
+	}
+	if p.Kind == "adonis" || strings.HasPrefix(kit, "adonis") {
+		if kit != "" && !strings.HasPrefix(kit, "adonis") {
+			kit = ""
+		}
+		go m.installAdonis(name, p.Path, kit)
+		return nil
 	}
 	go m.installLaravel(name, p.Path, kit)
 	return nil

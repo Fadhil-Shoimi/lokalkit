@@ -128,7 +128,7 @@ var wantedModules = []string{
 	"access_compat", "actions", "alias", "allowmethods", "auth_basic", "authn_core",
 	"authn_file", "authz_core", "authz_groupfile", "authz_host", "authz_user",
 	"autoindex", "deflate", "dir", "env", "expires", "filter", "headers", "include",
-	"log_config", "mime", "negotiation", "proxy", "proxy_fcgi", "proxy_http",
+	"log_config", "mime", "negotiation", "proxy", "proxy_fcgi", "proxy_http", "proxy_wstunnel",
 	"rewrite", "setenvif", "version",
 }
 

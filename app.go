@@ -539,6 +539,21 @@ func (a *App) DropDatabase(name string) error {
 	return a.m.DropDatabase(name)
 }
 
+// StartDev / StopDev run an AdonisJS project's dev server.
+func (a *App) StartDev(name string) error {
+	if err := a.ready(); err != nil {
+		return err
+	}
+	return a.m.StartDev(name)
+}
+
+func (a *App) StopDev(name string) error {
+	if err := a.ready(); err != nil {
+		return err
+	}
+	return a.m.StopDev(name)
+}
+
 // FixAppURL points a project's APP_URL at its LokalKit address.
 func (a *App) FixAppURL(name string) error {
 	if err := a.ready(); err != nil {

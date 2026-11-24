@@ -97,24 +97,28 @@ function renderProjects(projects) {
   }
   $('#projects').innerHTML = projects.map((p) => `
     <div class="card proj">
-      <div class="proj-icon ${p.kind}">${icon(p.kind === 'php' ? 'code' : p.kind === 'laravel' ? 'code' : 'globe')}</div>
+      <div class="proj-icon ${p.kind}">${icon(p.kind === 'wordpress' ? 'globe' : p.kind === 'adonis' ? 'terminal' : 'code')}</div>
       <div class="proj-main">
-        <div class="proj-name">${esc(p.name)}${p.kind !== 'php' ? `<span class="badge ${p.kind}">${p.kind}</span>` : ''}${p.linked ? `<span class="badge linked" title="${esc(p.path)}">imported</span>` : ''}</div>
+        <div class="proj-name">${esc(p.name)}${p.kind !== 'php' ? `<span class="badge ${p.kind}">${p.kind === 'adonis' ? 'adonisjs' : p.kind}</span>` : ''}${p.linked ? `<span class="badge linked" title="${esc(p.path)}">imported</span>` : ''}</div>
         <div class="proj-links">
           ${p.https
             ? `<a class="proj-url" data-url="${esc(p.https)}" title="${apacheUp ? 'Open in browser' : 'Start Apache first'}">${esc(p.https)}</a>
                <a class="proj-url alt" data-url="${esc(p.url)}">http</a>`
             : `<a class="proj-url" data-url="${esc(p.url)}" title="${apacheUp ? 'Open in browser' : 'Start Apache first'}">${esc(p.url)}</a>`}
         </div>
+        ${p.kind === 'adonis' && !p.task ? `<div class="proj-dev ${p.devRunning ? 'on' : ''}"><span class="dot"></span>${p.devRunning ? `Dev server running on port ${p.proxyPort}` : `Dev server stopped (port ${p.proxyPort})`}</div>` : ''}
         ${p.task ? `<div class="proj-task"><span class="spin"></span>${esc(p.task)}</div>`
-          : p.error ? `<div class="proj-warn">⚠ Laravel setup failed: ${esc(p.error)} <button class="linkish" data-repair="${esc(p.name)}">Retry</button></div>`
+          : p.error ? `<div class="proj-warn">⚠ Setup failed: ${esc(p.error)} <button class="linkish" data-repair="${esc(p.name)}">Retry</button></div>`
           : p.needsAssets && !p.needsDeps ? `<div class="proj-warn">⚠ The front-end is not built yet (needs Node.js). <button class="linkish" data-repair="${esc(p.name)}">Build now</button></div>`
-          : p.needsDeps ? `<div class="proj-warn">⚠ Composer packages are missing (vendor folder), so the app can't run. <button class="linkish" data-repair="${esc(p.name)}">Repair</button></div>` : ''}
+          : p.needsDeps ? `<div class="proj-warn">⚠ ${p.kind === 'adonis' ? 'npm packages are missing (node_modules)' : 'Composer packages are missing (vendor folder)'}, so the app can't run. <button class="linkish" data-repair="${esc(p.name)}">Repair</button></div>` : ''}
         ${p.envUrlMismatch ? `<div class="proj-warn">⚠ APP_URL in .env is <code>${esc(p.envUrl)}</code>, but LokalKit serves this project at <code>${esc(p.https || p.url)}</code>. <button class="linkish" data-fixappurl="${esc(p.name)}">Fix APP_URL</button></div>` : ''}
         ${(state.missingDbs || []).filter((d) => d.project === p.name).map((d) => `<div class="proj-warn">⚠ Database <code>${esc(d.database)}</code> (from .env) doesn't exist in MySQL. <button class="linkish" data-createdb="${esc(p.name)}">Create it${d.laravel ? ' + migrate' : ''}</button></div>`).join('')}
         ${(state.missingHosts || []).includes(p.host) ? `<div class="proj-warn">⚠ Not in the Windows hosts file yet, so browsers can't find it. <button class="linkish" data-fixhosts="1">Fix now</button> or <button class="linkish" data-uselocalhost="1">use .localhost instead</button> (works without the hosts file)</div>` : ''}
       </div>
       <div class="proj-btns">
+        ${p.kind === 'adonis' && !p.task && !p.needsDeps ? (p.devRunning
+          ? `<button class="btn small danger" data-dev-stop="${esc(p.name)}" title="Stop the dev server">${icon('stop')}Stop</button>`
+          : `<button class="btn small primary" data-dev-start="${esc(p.name)}" title="Start the dev server (node ace serve --hmr)">${icon('play')}Start</button>`) : ''}
         <button class="btn small" data-folder="${esc(p.name)}" title="Open folder">${icon('folder')}Folder</button>
         <button class="btn small" data-term="${esc(p.path)}" title="Open a terminal here">${icon('terminal')}Terminal</button>
         ${p.linked ? `<button class="btn small ghost" data-unlink="${esc(p.name)}" title="Remove from LokalKit. The files stay where they are.">${icon('x')}Remove</button>` : ''}
@@ -356,6 +360,10 @@ document.addEventListener('click', (ev) => {
       renderProjects(state.projects);
       if (!state.missingHosts.length) toast('Hosts file updated. Reload the page in your browser.');
     }, t);
+  } else if (t.dataset.devStart) {
+    run(async () => { await api.StartDev(t.dataset.devStart); await refreshProjects(); }, t);
+  } else if (t.dataset.devStop) {
+    run(async () => { await api.StopDev(t.dataset.devStop); await refreshProjects(); }, t);
   } else if (t.dataset.fixappurl) {
     run(async () => { await api.FixAppURL(t.dataset.fixappurl); await refreshProjects(); toast('APP_URL updated (backup: .env.before-lokalkit). Restart npm run dev if it is running.'); }, t);
   } else if (t.dataset.createdb) {
@@ -423,7 +431,8 @@ $('#newProject').addEventListener('submit', async (ev) => {
     $('#npDbName').value = '';
     updateDbHint();
     await refreshProjects();
-    toast($('#npKind').value.startsWith('laravel') ? `Creating ${p.name} with the latest Laravel… this takes a few minutes` : `Project ${p.name} created → ${p.https || p.url || ''}`);
+    toast($('#npKind').value.startsWith('adonis') ? `Creating ${p.name} with the latest AdonisJS… this takes a few minutes`
+      : $('#npKind').value.startsWith('laravel') ? `Creating ${p.name} with the latest Laravel… this takes a few minutes` : `Project ${p.name} created → ${p.https || p.url || ''}`);
   }
 });
 
@@ -435,6 +444,12 @@ function updateDbHint() {
   $('#npDbName').placeholder = auto;
   $('#npDbNameWrap').hidden = mode !== 'mysql';
   const laravel = kind.startsWith('laravel');
+  const adonis = kind.startsWith('adonis');
+  if (adonis) {
+    $('#npDbHint').textContent = mode === 'mysql' ? '· Lucid is set up for MySQL and migrations run'
+      : mode === 'sqlite' ? '· SQLite file (the starter kit default), migrations run' : '';
+    return;
+  }
   $('#npDbHint').textContent =
     mode === 'mysql' ? (laravel ? '· .env is set up and tables (users, sessions…) are created' : '· user root, no password')
     : mode === 'sqlite' ? (laravel ? '· database/database.sqlite, tables created' : '· use PDO with a .sqlite file')

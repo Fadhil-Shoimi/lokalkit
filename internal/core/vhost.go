@@ -20,6 +20,8 @@ type Project struct {
 	HTTPS          string `json:"https"`          // https URL when HTTPS is enabled
 	Kind           string `json:"kind"`           // laravel, wordpress, php
 	Linked         bool   `json:"linked"`         // folder lives outside www (imported)
+	ProxyPort      int    `json:"proxyPort"`      // AdonisJS: port of its own server, proxied by Apache
+	DevRunning     bool   `json:"devRunning"`     // AdonisJS: dev server running
 	Task           string `json:"task"`           // set while Composer/Laravel setup runs
 	Error          string `json:"error"`          // last Composer/Laravel setup error
 	NeedsDeps      bool   `json:"needsDeps"`      // composer.json but no vendor/
@@ -82,6 +84,9 @@ func projectFromDir(name, dir string, cfg Config) (Project, bool) {
 		p.DocRoot = filepath.Join(dir, "public")
 	}
 	switch {
+	case isAdonisDir(dir):
+		p.Kind = "adonis"
+		p.ProxyPort = adonisPort(dir)
 	case exists(filepath.Join(dir, "artisan")):
 		p.Kind = "laravel"
 	case exists(filepath.Join(dir, "wp-config.php")) || exists(filepath.Join(dir, "wp-login.php")):
@@ -170,6 +175,12 @@ func (m *Manager) WriteVhosts(ssl *SSLFiles) error {
 		conf := BuildVhost(p, cfg.ApachePort)
 		if ssl != nil {
 			conf += "\n" + BuildSSLVhost(p, *ssl)
+		}
+		if p.Kind == "adonis" && p.ProxyPort > 0 {
+			conf = BuildProxyVhost(p, cfg.ApachePort, nil)
+			if ssl != nil {
+				conf += "\n" + BuildProxyVhost(p, cfg.ApachePort, ssl)
+			}
 		}
 		if err := os.WriteFile(filepath.Join(dir, "auto."+p.Host+".conf"), []byte(conf), 0o644); err != nil {
 			return err

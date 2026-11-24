@@ -348,3 +348,14 @@ legend { font-weight: 600; padding: 0 6px; }
   .projects .proj-url { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
   .components { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 }
+
+/* ---------- AdonisJS ---------- */
+.badge.adonis { background: #ece9ff; color: #5a45ff; }
+.proj-icon.adonis { background: #ece9ff; color: #5a45ff; }
+@media (prefers-color-scheme: dark) {
+  .badge.adonis { background: #221d45; color: #a79bff; }
+  .proj-icon.adonis { background: #221d45; color: #a79bff; }
+}
+.proj-dev { margin-top: 4px; font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 7px; }
+.proj-dev .dot { width: 7px; height: 7px; }
+.proj-dev.on .dot { background: var(--ok); }

@@ -96,6 +96,17 @@ Publishing a release: create a release with a tag such as `v0.2.0` on GitHub. Th
 - **Laravel `.env`**: `APP_URL` is changed to the new address, and `DB_PORT`/`MAIL_PORT` follow LokalKit's settings. The original is saved as `.env.before-lokalkit`.
 - **Databases**: the panel lists the databases in Laragon's MySQL data folder (`C:\laragon\data\mysql-*`). **Copy selected databases** opens that folder with Laragon's own MySQL on a spare port, exports the chosen databases and imports them into LokalKit's MySQL. Close Laragon first and start LokalKit's MySQL. A database with the same name in LokalKit is replaced. The Laragon data itself is not changed.
 
+## AdonisJS projects (Node.js + TypeScript)
+
+**New project → AdonisJS** (server-rendered pages, + React or + Vue) uses the official `create-adonisjs` starter kits (latest AdonisJS) with LokalKit's Node.js. Each project gets:
+
+- its own port (`PORT` in `.env`, from 3333 up) and `APP_URL` set to `https://name.localhost`
+- a database: **MySQL** (Lucid configured with `node ace configure @adonisjs/lucid --db=mysql`, LokalKit's credentials in `.env`, migrations run), **SQLite** (the kit default) or none
+- a **dev server** (`node ace serve --hmr`) started for you, with **Start / Stop** on the project; output goes to `logs\dev-<name>.log`
+- an Apache reverse proxy so `https://name.localhost` reaches the dev server, hot reload websockets included. When the dev server is stopped the page says so
+
+Dev servers stop when LokalKit quits (Stop All).
+
 ## A quiet terminal for older projects
 
 - **PHP "Deprecated" notices are hidden by default** (`error_reporting = E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED`). Older packages (e.g. projects from Laragon) running on a newer PHP print many of them for code you didn't write. Turn them back on in **Settings → General**. A custom `error_reporting` you set yourself is never changed

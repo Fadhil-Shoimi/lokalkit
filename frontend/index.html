@@ -81,11 +81,18 @@
           <div class="np-row">
             <input id="npName" class="field" placeholder="project-name" autocomplete="off" spellcheck="false"/>
             <select id="npKind" class="field">
-              <option value="blank">Blank PHP</option>
-              <option value="laravel">Laravel</option>
-              <option value="laravel-react">Laravel + React starter kit</option>
-              <option value="laravel-vue">Laravel + Vue starter kit</option>
-              <option value="laravel-livewire">Laravel + Livewire starter kit</option>
+              <optgroup label="PHP">
+                <option value="blank">Blank PHP</option>
+                <option value="laravel">Laravel</option>
+                <option value="laravel-react">Laravel + React starter kit</option>
+                <option value="laravel-vue">Laravel + Vue starter kit</option>
+                <option value="laravel-livewire">Laravel + Livewire starter kit</option>
+              </optgroup>
+              <optgroup label="Node.js (TypeScript)">
+                <option value="adonis-hypermedia">AdonisJS (server-rendered pages)</option>
+                <option value="adonis-react">AdonisJS + React</option>
+                <option value="adonis-vue">AdonisJS + Vue</option>
+              </optgroup>
             </select>
             <button class="btn primary" type="submit" data-icon="plus">Create</button>
           </div>

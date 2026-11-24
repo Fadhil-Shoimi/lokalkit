@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -57,6 +58,7 @@ type Manager struct {
 	ConfirmTrust func() bool
 
 	tasks projectTasks // background Composer/Laravel jobs per project
+	devs  devServers   // AdonisJS dev servers per project
 
 	watchMu sync.Mutex
 	projSig string // last seen projects signature (see WatchProjects)
@@ -271,6 +273,7 @@ func (m *Manager) StartAll() error {
 }
 
 func (m *Manager) StopAll() error {
+	m.stopAllDev()
 	return m.forAll(func(s Service) error { return m.Stop(s.ID()) })
 }
 
@@ -331,7 +334,7 @@ func (m *Manager) Reload() error {
 func (m *Manager) projectsSignature() string {
 	var b strings.Builder
 	for _, p := range m.Projects() {
-		b.WriteString(p.Host + "=" + p.DocRoot + "\n")
+		b.WriteString(p.Host + "=" + p.DocRoot + "@" + strconv.Itoa(p.ProxyPort) + "\n")
 	}
 	return b.String()
 }

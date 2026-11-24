@@ -240,6 +240,13 @@ func (m *Manager) CreateProject(name, kind string, db DBChoice) (Project, error)
 		m.tasks.rememberKit(name, kind)
 		// Runs in the background; progress shows on the project row.
 		go m.installLaravel(name, dir, kind)
+	case "adonis-hypermedia", "adonis-react", "adonis-vue":
+		if m.nodeBin() == "" {
+			_ = os.Remove(dir)
+			return Project{}, errors.New("AdonisJS needs Node.js. Install it from the Install tab")
+		}
+		m.tasks.rememberKit(name, kind)
+		go m.installAdonis(name, dir, kind)
 	default:
 		page := blankIndexPHP(name, db, m.config().MySQLPort)
 		if err := os.WriteFile(filepath.Join(dir, "index.php"), []byte(page), 0o644); err != nil {
