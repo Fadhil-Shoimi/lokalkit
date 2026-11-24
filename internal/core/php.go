@@ -88,7 +88,10 @@ func (m *Manager) EnsurePHPIni(php PHPInstall) error {
 		return exists(filepath.Join(php.Dir, "ext", "php_"+ext+".dll"))
 	})
 	m.Logf("info", "Created php.ini for PHP %s", php.Version)
-	return os.WriteFile(ini, []byte(out), 0o644)
+	if err := os.WriteFile(ini, []byte(out), 0o644); err != nil {
+		return err
+	}
+	return m.fixExtensionDir(php, ini) // e.g. drop settings this PHP deprecates
 }
 
 // BuildPHPIni applies LokalKit defaults to a php.ini template.
@@ -156,6 +159,10 @@ func (m *Manager) fixExtensionDir(php PHPInstall, ini string) error {
 	if deduped, n := DedupeExtensions(fixed); n > 0 {
 		fixed, changed = deduped, true
 		m.Logf("info", "Removed %d duplicate extension line(s) from %s", n, ini)
+	}
+	if cleaned, keys := DisableDeprecatedINI(fixed, php.Version); len(keys) > 0 {
+		fixed, changed = cleaned, true
+		m.Logf("info", "Turned off settings PHP %s no longer supports: %s", php.Version, strings.Join(keys, ", "))
 	}
 	if !changed {
 		return nil
@@ -244,4 +251,38 @@ func (m *Manager) AdoptPHPIni(fromName, toName string) error {
 	}
 	m.Logf("info", "Copied your php.ini settings from PHP %s to PHP %s", from.Version, to.Version)
 	return m.EnsurePHPIni(to) // fixes extension_dir
+}
+
+// deprecatedINI lists php.ini settings by the PHP version that deprecated
+// them. Leaving them set makes every php command print "Deprecated: PHP
+// Startup: ... INI setting is deprecated".
+var deprecatedINI = []struct {
+	since string
+	keys  []string
+}{
+	{"8.4.0", []string{"session.sid_length", "session.sid_bits_per_character"}},
+}
+
+// DisableDeprecatedINI comments out settings deprecated in phpVersion.
+func DisableDeprecatedINI(ini, phpVersion string) (string, []string) {
+	var turnedOff []string
+	for _, d := range deprecatedINI {
+		if versionLess(phpVersion, d.since) {
+			continue
+		}
+		for _, key := range d.keys {
+			re := regexp.MustCompile(`(?m)^[ \t]*` + regexp.QuoteMeta(key) + `[ \t]*=.*$`)
+			if re.MatchString(ini) {
+				ini = re.ReplaceAllStringFunc(ini, func(line string) string {
+					cr := ""
+					if strings.HasSuffix(line, "\r") {
+						cr = "\r"
+					}
+					return ";" + strings.TrimRight(strings.TrimLeft(line, " \t"), "\r") + " ; deprecated in PHP " + d.since[:3] + ", disabled by LokalKit" + cr
+				})
+				turnedOff = append(turnedOff, key)
+			}
+		}
+	}
+	return ini, turnedOff
 }

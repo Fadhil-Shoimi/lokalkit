@@ -478,3 +478,20 @@ func TestDatabaseHelpers(t *testing.T) {
 		t.Errorf("uses: %v", uses)
 	}
 }
+
+func TestDisableDeprecatedINI(t *testing.T) {
+	ini := "[Session]\r\nsession.sid_length = 26\r\nsession.sid_bits_per_character = 5\r\n;session.sid_length = 32\r\nsession.name = PHPSESSID\r\n"
+	out, keys := DisableDeprecatedINI(ini, "8.4.15")
+	if len(keys) != 2 || strings.Contains(out, "\nsession.sid_length") || !strings.Contains(out, ";session.sid_length = 26 ; deprecated in PHP 8.4") || !strings.Contains(out, "session.name = PHPSESSID\r\n") {
+		t.Fatalf("%v\n%q", keys, out)
+	}
+	if _, keys := DisableDeprecatedINI(out, "8.4.15"); len(keys) != 0 {
+		t.Error("should be idempotent")
+	}
+	if _, keys := DisableDeprecatedINI(ini, "8.3.37"); len(keys) != 0 {
+		t.Error("PHP 8.3 still supports these settings")
+	}
+	if _, keys := DisableDeprecatedINI(ini, "8.5.13"); len(keys) != 2 {
+		t.Error("newer PHP should be cleaned too")
+	}
+}
