@@ -57,7 +57,8 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		BackgroundColour: &options.RGBA{R: 246, G: 247, B: 249, A: 1},
+		// Matches the splash so the window never flashes white while loading.
+		BackgroundColour: &options.RGBA{R: 21, G: 23, B: 28, A: 1},
 		OnStartup:        app.startup,
 		OnShutdown:       app.shutdown,
 		OnBeforeClose:    app.beforeClose,

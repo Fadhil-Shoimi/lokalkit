@@ -707,4 +707,23 @@ on('services', (s) => {
 });
 on('log', addLog);
 
-refresh();
+// ---------- splash ----------
+// The splash plays its switch-on animation once, then fades out as soon as
+// the first state has loaded (never sooner than the animation, never
+// later than a few seconds even if loading hangs).
+const splashStart = performance.now();
+function hideSplash() {
+  const el = $('#splash');
+  if (!el || el.classList.contains('out')) return;
+  const wait = Math.max(0, 1700 - (performance.now() - splashStart));
+  setTimeout(() => {
+    el.classList.add('out');
+    setTimeout(() => el.remove(), 400);
+  }, wait);
+}
+setTimeout(hideSplash, 6000);
+
+refresh().catch((e) => {
+  $('#fatal').hidden = false;
+  $('#fatal').textContent = String(e);
+}).finally(hideSplash);

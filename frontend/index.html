@@ -4,8 +4,50 @@
   <meta charset="UTF-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <title>LokalKit</title>
+  <style>
+    /* Splash: inline so it paints before the app bundle loads. */
+    html{background:#15171C}
+    #splash{position:fixed;inset:0;z-index:1000;background:#15171C;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;font-family:"Segoe UI",Inter,system-ui,sans-serif;transition:opacity .35s ease}
+    #splash.out{opacity:0;pointer-events:none}
+    #splash .sp-glow{position:absolute;left:50%;top:42%;width:620px;height:380px;transform:translate(-50%,-50%);background:radial-gradient(closest-side,rgba(250,204,21,.22),rgba(250,204,21,0));opacity:0;animation:sp-glow 1.6s ease-out .5s forwards}
+    #splash .sp-pill{position:relative;width:240px;height:120px;border-radius:60px;background:#2A2D35;display:flex;align-items:center;padding:0 16px;box-sizing:border-box;animation:sp-pill .9s ease-in-out .35s forwards}
+    #splash .sp-knob{width:88px;height:88px;border-radius:50%;background:#15171C;display:flex;align-items:center;justify-content:center;animation:sp-knob .9s cubic-bezier(.6,0,.2,1) .35s forwards}
+    #splash .sp-knob svg{opacity:.35;animation:sp-power .5s ease-out .9s forwards}
+    #splash .sp-text{margin-top:34px;display:flex;flex-direction:column;align-items:center;opacity:0;transform:translateY(8px);animation:sp-in .6s ease-out 1s forwards}
+    #splash .sp-name{font-family:Sora,"Segoe UI",sans-serif;font-weight:700;font-size:34px;letter-spacing:-1.2px;line-height:1}
+    #splash .sp-by{margin-top:8px;font-size:13px;color:#A7ACB6;letter-spacing:.4px}
+    #splash .sp-foot{position:absolute;bottom:26px;font-size:11px;color:#6C727D;letter-spacing:2px;text-transform:uppercase}
+    @keyframes sp-pill{to{background:#FACC15}}
+    @keyframes sp-knob{to{transform:translateX(120px)}}
+    @keyframes sp-power{to{opacity:1}}
+    @keyframes sp-glow{to{opacity:1}}
+    @keyframes sp-in{to{opacity:1;transform:none}}
+    @media (prefers-reduced-motion: reduce){
+      #splash *{animation-duration:1ms!important;animation-delay:0s!important}
+    }
+  </style>
 </head>
 <body>
+  <div id="splash" role="status" aria-label="LokalKit is starting">
+    <div class="sp-glow"></div>
+    <div class="sp-pill">
+      <div class="sp-knob">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#FACC15" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.9a8 8 0 1 0 11.4 0"/></svg>
+      </div>
+    </div>
+    <div class="sp-text">
+      <div class="sp-name">LokalKit</div>
+      <div class="sp-by">by Codeslab</div>
+    </div>
+    <div class="sp-foot" id="splashStatus">Turning your stack on</div>
+  </div>
+  <script>
+    // Last resort: never leave the splash up, even if the app script fails.
+    setTimeout(function () {
+      var e = document.getElementById('splash');
+      if (e) { e.classList.add('out'); setTimeout(function () { e.remove(); }, 400); }
+    }, 8000);
+  </script>
   <header class="topbar">
     <div class="topbar-inner">
       <div class="brand">
