@@ -539,6 +539,14 @@ func (a *App) DropDatabase(name string) error {
 	return a.m.DropDatabase(name)
 }
 
+// FixAppURL points a project's APP_URL at its LokalKit address.
+func (a *App) FixAppURL(name string) error {
+	if err := a.ready(); err != nil {
+		return err
+	}
+	return a.m.FixAppURL(name)
+}
+
 // FixHosts adds every project to the Windows hosts file (asks for admin).
 func (a *App) FixHosts() ([]string, error) {
 	if err := a.ready(); err != nil {

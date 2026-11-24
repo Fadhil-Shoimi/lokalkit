@@ -113,6 +113,7 @@ func (m *Manager) annotate(ps []Project) []Project {
 		ps[i].Task, _ = m.tasks.get(ps[i].Name)
 		ps[i].Error = m.tasks.getError(ps[i].Name)
 		ps[i].NeedsAssets = needsAssets(ps[i].Path)
+		ps[i].EnvURL, ps[i].EnvURLMismatch = envURLStatus(ps[i])
 		ps[i].NeedsDeps = exists(filepath.Join(ps[i].Path, "composer.json")) &&
 			!exists(filepath.Join(ps[i].Path, "vendor", "autoload.php"))
 	}
@@ -589,4 +590,78 @@ func (m *Manager) RepairProject(name string) error {
 	}
 	go m.installLaravel(name, p.Path, kit)
 	return nil
+}
+
+// envURLStatus compares APP_URL in a Laravel .env with the address LokalKit
+// serves the project at (e.g. .test from Laragon vs .localhost here).
+func envURLStatus(p Project) (string, bool) {
+	if p.Kind != "laravel" {
+		return "", false
+	}
+	b, err := os.ReadFile(filepath.Join(p.Path, ".env"))
+	if err != nil {
+		return "", false
+	}
+	appURL := envValue(string(b), "APP_URL")
+	if appURL == "" {
+		return "", false
+	}
+	host := urlHost(appURL)
+	return appURL, host != "" && host != urlHost(firstNonEmpty(p.HTTPS, p.URL)) && !isLoopbackHost(host)
+}
+
+func urlHost(u string) string {
+	u = strings.TrimPrefix(strings.TrimPrefix(u, "https://"), "http://")
+	if i := strings.IndexAny(u, "/?#"); i >= 0 {
+		u = u[:i]
+	}
+	return strings.ToLower(u)
+}
+
+// isLoopbackHost: APP_URL=http://localhost (Laravel's default) works with
+// any address for most apps, so it isn't flagged.
+func isLoopbackHost(h string) bool {
+	h = strings.Split(h, ":")[0]
+	return h == "localhost" || h == "127.0.0.1"
+}
+
+// FixAppURL sets APP_URL to the project's LokalKit address (keeping a backup).
+func (m *Manager) FixAppURL(name string) error {
+	p := m.findProject(name)
+	if p.Path == "" {
+		return fmt.Errorf("project %s not found", name)
+	}
+	envPath := filepath.Join(p.Path, ".env")
+	b, err := os.ReadFile(envPath)
+	if err != nil {
+		return errors.New("this project has no .env file")
+	}
+	backup := envPath + ".before-lokalkit"
+	if !exists(backup) {
+		_ = os.WriteFile(backup, b, 0o644)
+	}
+	url := firstNonEmpty(p.HTTPS, p.URL)
+	if err := os.WriteFile(envPath, []byte(SetEnvValues(string(b), map[string]string{"APP_URL": url})), 0o644); err != nil {
+		return err
+	}
+	m.Logf("ok", "%s: APP_URL is now %s", name, url)
+	return nil
+}
+
+// syncAppURLs follows a domain/port/HTTPS change: Laravel projects whose
+// APP_URL pointed at their old LokalKit address get the new one.
+func (m *Manager) syncAppURLs(old Config) {
+	for _, p := range m.Projects() {
+		if p.Kind != "laravel" || p.EnvURL == "" {
+			continue
+		}
+		before, ok := projectFromDir(p.Name, p.Path, old)
+		if !ok {
+			continue
+		}
+		h := urlHost(p.EnvURL)
+		if h == urlHost(before.HTTPS) || h == urlHost(before.URL) {
+			_ = m.FixAppURL(p.Name)
+		}
+	}
 }

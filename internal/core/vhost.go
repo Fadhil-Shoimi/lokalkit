@@ -12,18 +12,20 @@ import (
 )
 
 type Project struct {
-	Name        string `json:"name"`
-	Path        string `json:"path"`
-	DocRoot     string `json:"docRoot"`
-	Host        string `json:"host"`
-	URL         string `json:"url"`
-	HTTPS       string `json:"https"`       // https URL when HTTPS is enabled
-	Kind        string `json:"kind"`        // laravel, wordpress, php
-	Linked      bool   `json:"linked"`      // folder lives outside www (imported)
-	Task        string `json:"task"`        // set while Composer/Laravel setup runs
-	Error       string `json:"error"`       // last Composer/Laravel setup error
-	NeedsDeps   bool   `json:"needsDeps"`   // composer.json but no vendor/
-	NeedsAssets bool   `json:"needsAssets"` // starter kit front-end not built yet
+	Name           string `json:"name"`
+	Path           string `json:"path"`
+	DocRoot        string `json:"docRoot"`
+	Host           string `json:"host"`
+	URL            string `json:"url"`
+	HTTPS          string `json:"https"`          // https URL when HTTPS is enabled
+	Kind           string `json:"kind"`           // laravel, wordpress, php
+	Linked         bool   `json:"linked"`         // folder lives outside www (imported)
+	Task           string `json:"task"`           // set while Composer/Laravel setup runs
+	Error          string `json:"error"`          // last Composer/Laravel setup error
+	NeedsDeps      bool   `json:"needsDeps"`      // composer.json but no vendor/
+	NeedsAssets    bool   `json:"needsAssets"`    // starter kit front-end not built yet
+	EnvURL         string `json:"envUrl"`         // APP_URL from the project's .env
+	EnvURLMismatch bool   `json:"envUrlMismatch"` // APP_URL points somewhere else (e.g. .test from Laragon)
 }
 
 var hostLabelRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)

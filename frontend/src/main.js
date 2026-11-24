@@ -110,6 +110,7 @@ function renderProjects(projects) {
           : p.error ? `<div class="proj-warn">⚠ Laravel setup failed: ${esc(p.error)} <button class="linkish" data-repair="${esc(p.name)}">Retry</button></div>`
           : p.needsAssets && !p.needsDeps ? `<div class="proj-warn">⚠ The front-end is not built yet (needs Node.js). <button class="linkish" data-repair="${esc(p.name)}">Build now</button></div>`
           : p.needsDeps ? `<div class="proj-warn">⚠ Composer packages are missing (vendor folder), so the app can't run. <button class="linkish" data-repair="${esc(p.name)}">Repair</button></div>` : ''}
+        ${p.envUrlMismatch ? `<div class="proj-warn">⚠ APP_URL in .env is <code>${esc(p.envUrl)}</code>, but LokalKit serves this project at <code>${esc(p.https || p.url)}</code>. <button class="linkish" data-fixappurl="${esc(p.name)}">Fix APP_URL</button></div>` : ''}
         ${(state.missingDbs || []).filter((d) => d.project === p.name).map((d) => `<div class="proj-warn">⚠ Database <code>${esc(d.database)}</code> (from .env) doesn't exist in MySQL. <button class="linkish" data-createdb="${esc(p.name)}">Create it${d.laravel ? ' + migrate' : ''}</button></div>`).join('')}
         ${(state.missingHosts || []).includes(p.host) ? `<div class="proj-warn">⚠ Not in the Windows hosts file yet, so browsers can't find it. <button class="linkish" data-fixhosts="1">Fix now</button> or <button class="linkish" data-uselocalhost="1">use .localhost instead</button> (works without the hosts file)</div>` : ''}
       </div>
@@ -355,6 +356,8 @@ document.addEventListener('click', (ev) => {
       renderProjects(state.projects);
       if (!state.missingHosts.length) toast('Hosts file updated. Reload the page in your browser.');
     }, t);
+  } else if (t.dataset.fixappurl) {
+    run(async () => { await api.FixAppURL(t.dataset.fixappurl); await refreshProjects(); toast('APP_URL updated (backup: .env.before-lokalkit). Restart npm run dev if it is running.'); }, t);
   } else if (t.dataset.createdb) {
     run(async () => { await api.CreateProjectDatabase(t.dataset.createdb); await refreshProjects(); if (!$('#tab-databases').hidden) loadDatabases(); toast('Database created'); }, t);
   } else if (t.dataset.dbExport) {
@@ -492,6 +495,7 @@ $('#settings').addEventListener('submit', async (ev) => {
     ssl: f.ssl.checked,
     sslPort: +f.sslPort.value,
     checkUpdates: f.checkUpdates.checked,
+    hideDeprecations: f.hideDeprecations.checked,
   };
   const ok = await run(async () => { await api.SaveConfig(cfg); return true; }, ev.submitter);
   if (ok) { toast('Settings saved'); await refresh(); }

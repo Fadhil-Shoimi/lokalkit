@@ -495,3 +495,64 @@ func TestDisableDeprecatedINI(t *testing.T) {
 		t.Error("newer PHP should be cleaned too")
 	}
 }
+
+func TestSetDeprecationReporting(t *testing.T) {
+	ini := "; error_reporting = E_ALL\r\nerror_reporting = E_ALL\r\ndisplay_errors = On\r\n"
+	out, ok := SetDeprecationReporting(ini, true)
+	if !ok || !strings.Contains(out, "\nerror_reporting = E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED\r\n") || !strings.HasPrefix(out, "; error_reporting = E_ALL\r\n") {
+		t.Fatalf("%q", out)
+	}
+	if _, ok := SetDeprecationReporting(out, true); ok {
+		t.Error("idempotent")
+	}
+	back, ok := SetDeprecationReporting(out, false)
+	if !ok || !strings.Contains(back, "\nerror_reporting = E_ALL\r\n") {
+		t.Errorf("turn back on: %q", back)
+	}
+	custom := "error_reporting = E_ALL & ~E_NOTICE\n"
+	if _, ok := SetDeprecationReporting(custom, true); ok {
+		t.Error("a custom value must be left alone")
+	}
+}
+
+func TestAppURLMismatchAndSync(t *testing.T) {
+	m := newTestManager(t)
+	cfg := m.Config()
+	cfg.TLD = "localhost"
+	m.SaveConfig(cfg)
+	mk := func(name, appURL string) {
+		d := filepath.Join(m.P.WWW, name)
+		os.MkdirAll(d, 0o755)
+		os.WriteFile(filepath.Join(d, "artisan"), nil, 0o644)
+		os.WriteFile(filepath.Join(d, ".env"), []byte("APP_NAME=X\nAPP_URL="+appURL+"\n"), 0o644)
+	}
+	mk("hrms", "https://hrms.test")    // from Laragon
+	mk("shop", "http://localhost")     // Laravel default: fine
+	mk("app", "https://app.localhost") // already right
+	byName := map[string]Project{}
+	for _, p := range m.Projects() {
+		byName[p.Name] = p
+	}
+	if !byName["hrms"].EnvURLMismatch || byName["shop"].EnvURLMismatch || byName["app"].EnvURLMismatch {
+		t.Fatalf("%+v", byName)
+	}
+	if err := m.FixAppURL("hrms"); err != nil {
+		t.Fatal(err)
+	}
+	if p := m.findProject("hrms"); p.EnvURLMismatch || p.EnvURL != "https://hrms.localhost" {
+		t.Errorf("after fix: %+v", p)
+	}
+	if !exists(filepath.Join(m.P.WWW, "hrms", ".env.before-lokalkit")) {
+		t.Error("backup missing")
+	}
+	// Switching the domain moves APP_URLs that pointed at the old address.
+	cfg = m.Config()
+	cfg.TLD = "test"
+	m.SaveConfig(cfg)
+	if got := m.findProject("app").EnvURL; got != "https://app.test" {
+		t.Errorf("app not synced: %s", got)
+	}
+	if got := m.findProject("shop").EnvURL; got != "http://localhost" {
+		t.Errorf("default APP_URL must not change: %s", got)
+	}
+}

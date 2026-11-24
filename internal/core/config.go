@@ -23,6 +23,7 @@ type Config struct {
 	SSL              bool            `json:"ssl"`            // HTTPS for every project (https://name.test)
 	SSLPort          int             `json:"sslPort"`
 	CheckUpdates     bool            `json:"checkUpdates"`             // look for new LokalKit versions
+	HideDeprecations bool            `json:"hideDeprecations"`         // keep PHP deprecation notices out of terminals and pages
 	Linked           []LinkedProject `json:"linkedProjects,omitempty"` // project folders outside www
 }
 
@@ -46,6 +47,7 @@ func DefaultConfig() Config {
 		SSL:              true,
 		SSLPort:          443,
 		CheckUpdates:     true,
+		HideDeprecations: true,
 	}
 }
 

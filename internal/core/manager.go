@@ -113,6 +113,14 @@ func (m *Manager) SaveConfig(c Config) (bool, error) {
 	m.cfg = c
 	m.cfgMu.Unlock()
 	m.Logf("ok", "Settings saved")
+	if old.TLD != c.TLD || old.SSL != c.SSL || old.SSLPort != c.SSLPort || old.ApachePort != c.ApachePort {
+		m.syncAppURLs(old)
+	}
+	if old.HideDeprecations != c.HideDeprecations {
+		if php, ok := m.CurrentPHP(); ok {
+			_ = m.EnsurePHPIni(php)
+		}
+	}
 	return serviceSettingsChanged(old, c) && m.anyRunning(), nil
 }
 

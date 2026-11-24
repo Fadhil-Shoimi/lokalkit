@@ -160,6 +160,14 @@ func (m *Manager) fixExtensionDir(php PHPInstall, ini string) error {
 		fixed, changed = deduped, true
 		m.Logf("info", "Removed %d duplicate extension line(s) from %s", n, ini)
 	}
+	if adjusted, ok := SetDeprecationReporting(fixed, m.config().HideDeprecations); ok {
+		fixed, changed = adjusted, true
+		if m.config().HideDeprecations {
+			m.Logf("info", "PHP deprecation notices are now hidden (Settings → General)")
+		} else {
+			m.Logf("info", "PHP deprecation notices are shown again")
+		}
+	}
 	if cleaned, keys := DisableDeprecatedINI(fixed, php.Version); len(keys) > 0 {
 		fixed, changed = cleaned, true
 		m.Logf("info", "Turned off settings PHP %s no longer supports: %s", php.Version, strings.Join(keys, ", "))
@@ -285,4 +293,32 @@ func DisableDeprecatedINI(ini, phpVersion string) (string, []string) {
 		}
 	}
 	return ini, turnedOff
+}
+
+const (
+	reportAll           = "E_ALL"
+	reportNoDeprecation = "E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED"
+)
+
+var errorReportingRe = regexp.MustCompile(`(?m)^[ \t]*error_reporting[ \t]*=[ \t]*(.*?)[ \t]*\r?$`)
+
+// SetDeprecationReporting switches php.ini's error_reporting between E_ALL
+// and E_ALL without deprecation notices. Old packages on a new PHP print
+// many "Deprecated: ..." lines for code you didn't write; most local stacks
+// hide them. A custom error_reporting value set by the user is left alone.
+func SetDeprecationReporting(ini string, hide bool) (string, bool) {
+	loc := errorReportingRe.FindStringSubmatchIndex(ini)
+	want := reportAll
+	if hide {
+		want = reportNoDeprecation
+	}
+	if loc == nil {
+		return ini + "\nerror_reporting = " + want + "\n", true
+	}
+	cur := strings.Join(strings.Fields(ini[loc[2]:loc[3]]), " ")
+	known := map[string]bool{reportAll: true, reportNoDeprecation: true, "E_ALL & ~E_DEPRECATED & ~E_STRICT": true}
+	if !known[cur] || cur == want {
+		return ini, false
+	}
+	return ini[:loc[2]] + want + ini[loc[3]:], true
 }
