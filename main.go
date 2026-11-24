@@ -48,11 +48,12 @@ func main() {
 	}
 	err := wails.Run(&options.App{
 		Title: "LokalKit",
-		// Fixed size that fits the layout (1120px content + margins);
-		// resizing and maximise are turned off on purpose.
-		Width:         1184,
-		Height:        760,
-		DisableResize: true,
+		// Opens at a size that fits the one-column layout; wider windows
+		// (or maximised) get the side Activity panel and two-column lists.
+		Width:     1184,
+		Height:    760,
+		MinWidth:  980,
+		MinHeight: 640,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},

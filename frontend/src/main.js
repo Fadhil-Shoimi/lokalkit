@@ -209,11 +209,26 @@ async function installPHP(branch, label) {
 function addLog(e) {
   logs.push(e);
   if (logs.length > 300) logs = logs.slice(-300);
-  const box = $('#logs');
-  const stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
-  box.insertAdjacentHTML('beforeend', `<div class="log-line ${e.level}"><time>${esc(e.time)}</time><span>${esc(e.msg)}</span></div>`);
-  if (stick) box.scrollTop = box.scrollHeight;
+  const line = `<div class="log-line ${e.level}"><time>${esc(e.time)}</time><span>${esc(e.msg)}</span></div>`;
+  // Same lines in the Logs tab and in the side Activity panel (wide windows).
+  for (const box of [$('#logs'), $('#logsSide')]) {
+    const stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 24;
+    box.insertAdjacentHTML('beforeend', line);
+    while (box.childElementCount > 300) box.firstElementChild.remove();
+    if (stick) box.scrollTop = box.scrollHeight;
+  }
 }
+
+// Wide windows show logs in the side panel, so the Logs tab is hidden;
+// leave it if it was open when the window grew.
+const wideMQ = window.matchMedia('(min-width: 1400px)');
+function onWidthChange() {
+  if (wideMQ.matches) {
+    if (!$('#tab-logs').hidden) showTab('projects');
+    $('#logsSide').scrollTop = $('#logsSide').scrollHeight;
+  }
+}
+wideMQ.addEventListener('change', onWidthChange);
 
 function renderSettings() {
   const f = $('#settings');
@@ -318,6 +333,7 @@ async function refresh() {
     if (!state.services.some((x) => x.installed)) showTab('install');
   });
   $('#logs').innerHTML = '';
+  $('#logsSide').innerHTML = '';
   logs = [];
   state.logs.forEach(addLog);
 }
@@ -368,8 +384,9 @@ document.addEventListener('click', (ev) => {
     api.OpenURL(t.dataset.url);
   } else if (t.dataset.tab || t.dataset.tabGo) {
     showTab(t.dataset.tab || t.dataset.tabGo);
-  } else if (t.id === 'clearLog') {
+  } else if (t.id === 'clearLog' || t.id === 'clearLogSide') {
     $('#logs').innerHTML = '';
+    $('#logsSide').innerHTML = '';
   } else if (t.dataset.act) {
     const acts = {
       web: () => api.OpenWeb(),

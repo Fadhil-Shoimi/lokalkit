@@ -23,6 +23,7 @@ A local PHP development environment for Windows. **Apache + PHP + MySQL + Mailpi
 - **Database per new project**: choose *Create a MySQL database* (named after the project, editable; MySQL is started if needed; `.env` set up and migrations run, so the starter kits' login/register work right away), *SQLite*, or *No database*
 - **System tray**: a switch icon in the taskbar (yellow = services running, grey = stopped). Click to open, right-click to start/stop services and for shortcuts. The X button hides the app to the tray (configurable in Settings)
 - **One-click installer**: download Apache, PHP, MySQL, Mailpit, Composer, Adminer and the Visual C++ Runtime from their official sites, with SHA-256 checks where the source publishes them
+- **Wide windows** (maximised, 1400px+): an **Activity** panel with the live log stays on the right, and projects and databases are shown in two columns. Smaller windows use the one-column layout with a Logs tab
 - Configurable ports. Everything lives in one folder, so the install is portable
 
 ## Folder layout

@@ -319,3 +319,32 @@ legend { font-weight: 600; padding: 0 6px; }
 .update-banner { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); background: var(--accent-soft); }
 .update-banner .ub-icon .ico { width: 20px; height: 20px; color: var(--accent-text); }
 .ub-text { flex: 1; min-width: 0; }
+
+/* ---------- wide layout: side Activity panel + 2-column lists ---------- */
+.layout { display: block; }
+.main-col { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.side { display: none; }
+@media (min-width: 1400px) {
+  :root { --max: 1680px; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 18px; align-items: start; }
+  .side {
+    display: flex; flex-direction: column; position: sticky; top: 0;
+    height: calc(100vh - 58px - 44px); min-height: 360px; overflow: hidden;
+  }
+  .side-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px 10px 16px; border-bottom: 1px solid var(--border); }
+  .side-tools { display: flex; gap: 2px; }
+  .side-tools .btn { padding: 0 7px; }
+  .side-logs { flex: 1; max-height: none; border: 0; border-radius: 0 0 var(--radius) var(--radius); font-size: 12px; }
+  .side-logs .log-line { flex-direction: column; gap: 0; padding: 4px 0; border-bottom: 1px solid #22252c; }
+  .side-logs .log-line:last-child { border-bottom: 0; }
+  .tab[data-tab="logs"] { display: none; }
+
+  /* Projects and databases in two columns of cards */
+  .projects { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
+  .projects > .empty { grid-column: 1 / -1; }
+  .projects .proj { flex-wrap: wrap; align-content: flex-start; }
+  .projects .proj-main { flex: 1 1 calc(100% - 60px); }
+  .projects .proj-btns { flex-basis: 100%; padding-left: 48px; flex-wrap: wrap; }
+  .projects .proj-url { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  .components { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+}

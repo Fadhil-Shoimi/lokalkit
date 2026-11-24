@@ -29,6 +29,8 @@
 
   <main>
    <div class="wrap">
+    <div class="layout">
+     <div class="main-col">
     <div id="fatal" class="fatal" hidden></div>
     <div class="card update-banner" id="updateBanner" hidden>
       <span data-icon="up" class="ub-icon"></span>
@@ -209,6 +211,18 @@
         </div>
       </form>
     </section>
+     </div>
+     <aside class="card side" id="sidePanel" aria-label="Activity">
+      <div class="side-head">
+        <b>Activity</b>
+        <div class="side-tools">
+          <button class="btn small ghost" data-folder="logs" title="Open the logs folder" data-icon="folder"></button>
+          <button class="btn small ghost" id="clearLogSide" title="Clear this view" data-icon="x"></button>
+        </div>
+      </div>
+      <div id="logsSide" class="logs side-logs"></div>
+     </aside>
+    </div>
    </div>
   </main>
 
