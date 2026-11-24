@@ -340,7 +340,7 @@ async function refresh() {
   $('#logs').innerHTML = '';
   $('#logsSide').innerHTML = '';
   logs = [];
-  state.logs.forEach(addLog);
+  (state.logs || []).forEach(addLog);
 }
 
 // ---------- events ----------

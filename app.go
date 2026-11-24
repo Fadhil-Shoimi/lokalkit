@@ -323,7 +323,7 @@ type State struct {
 func (a *App) GetState() State {
 	s := State{Version: AppVersion, Error: a.initErr}
 	if a.m == nil {
-		return s
+		return s.withEmptyLists()
 	}
 	s.Paths, s.Config = a.m.P, a.m.Config()
 	s.Services = a.m.Services()
@@ -336,6 +336,30 @@ func (a *App) GetState() State {
 	s.SSL = a.m.SSLStatus()
 	s.Missing = a.m.MissingFromHosts()
 	s.NoDB = a.m.MissingDatabases()
+	return s.withEmptyLists()
+}
+
+// withEmptyLists turns nil slices into empty ones, so the UI gets [] and
+// never null (which breaks .forEach/.length in JavaScript).
+func (s State) withEmptyLists() State {
+	if s.Services == nil {
+		s.Services = []core.ServiceInfo{}
+	}
+	if s.PHP == nil {
+		s.PHP = []core.PHPInstall{}
+	}
+	if s.Projects == nil {
+		s.Projects = []core.Project{}
+	}
+	if s.Logs == nil {
+		s.Logs = []core.LogEntry{}
+	}
+	if s.Missing == nil {
+		s.Missing = []string{}
+	}
+	if s.NoDB == nil {
+		s.NoDB = []core.MissingDatabase{}
+	}
 	return s
 }
 

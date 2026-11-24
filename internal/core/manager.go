@@ -144,7 +144,7 @@ func (m *Manager) Logf(level, format string, args ...any) {
 func (m *Manager) History() []LogEntry {
 	m.logMu.Lock()
 	defer m.logMu.Unlock()
-	return append([]LogEntry(nil), m.history...)
+	return append([]LogEntry{}, m.history...) // never nil: the UI expects a list
 }
 
 func (m *Manager) Services() []ServiceInfo {
