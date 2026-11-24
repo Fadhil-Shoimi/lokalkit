@@ -715,13 +715,13 @@ const splashStart = performance.now();
 function hideSplash() {
   const el = $('#splash');
   if (!el || el.classList.contains('out')) return;
-  const wait = Math.max(0, 1700 - (performance.now() - splashStart));
+  const wait = Math.max(0, 3400 - (performance.now() - splashStart));
   setTimeout(() => {
     el.classList.add('out');
-    setTimeout(() => el.remove(), 400);
+    setTimeout(() => el.remove(), 550);
   }, wait);
 }
-setTimeout(hideSplash, 6000);
+setTimeout(hideSplash, 8000);
 
 refresh().catch((e) => {
   $('#fatal').hidden = false;
