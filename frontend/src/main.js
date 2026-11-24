@@ -708,22 +708,25 @@ on('services', (s) => {
 on('log', addLog);
 
 // ---------- splash ----------
-// The splash plays its switch-on animation once, then fades out as soon as
-// the first state has loaded (never sooner than the animation, never
-// later than a few seconds even if loading hangs).
+// The splash stays for about 8 seconds (switch-on animation, then the
+// logo with a filling bar) once the first state has loaded; it never
+// stays past a few extra seconds if loading hangs.
 const splashStart = performance.now();
-function hideSplash() {
+function hideSplash(now = false) {
   const el = $('#splash');
   if (!el || el.classList.contains('out')) return;
-  const wait = Math.max(0, 3400 - (performance.now() - splashStart));
+  const wait = now ? 0 : Math.max(0, 7500 - (performance.now() - splashStart));
   setTimeout(() => {
     el.classList.add('out');
     setTimeout(() => el.remove(), 550);
   }, wait);
 }
-setTimeout(hideSplash, 8000);
+setTimeout(hideSplash, 12000);
+// A click or any key skips the rest of the splash.
+$('#splash')?.addEventListener('click', () => hideSplash(true));
+window.addEventListener('keydown', () => hideSplash(true), { once: true });
 
 refresh().catch((e) => {
   $('#fatal').hidden = false;
   $('#fatal').textContent = String(e);
-}).finally(hideSplash);
+}).finally(() => hideSplash());
