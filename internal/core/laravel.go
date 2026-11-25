@@ -114,6 +114,12 @@ func (m *Manager) annotate(ps []Project) []Project {
 		ps[i].Error = m.tasks.getError(ps[i].Name)
 		ps[i].NeedsAssets = needsAssets(ps[i].Path)
 		ps[i].EnvURL, ps[i].EnvURLMismatch = envURLStatus(ps[i])
+		if ps[i].Kind != "adonis" {
+			if php, _, missing, ok := m.ProjectPHPChoice(ps[i].Name); ok {
+				ps[i].PHP = m.config().ProjectPHP[ps[i].Name]
+				ps[i].PHPVersion, ps[i].PHPMissing = php.Version, missing
+			}
+		}
 		if ps[i].Kind == "adonis" {
 			ps[i].DevRunning = m.DevRunning(ps[i].Name)
 			ps[i].NeedsDeps = exists(filepath.Join(ps[i].Path, "package.json")) && !exists(filepath.Join(ps[i].Path, "node_modules"))
@@ -126,7 +132,7 @@ func (m *Manager) annotate(ps []Project) []Project {
 }
 
 func (m *Manager) composerCmd(ctx context.Context, dir string, args ...string) (*exec.Cmd, error) {
-	php, ok := m.CurrentPHP()
+	php, ok := m.phpForDir(dir)
 	if !ok {
 		return nil, errors.New("PHP not found. Install it from the Install tab")
 	}
@@ -139,19 +145,19 @@ func (m *Manager) composerCmd(ctx context.Context, dir string, args ...string) (
 	}
 	cmd := exec.CommandContext(ctx, filepath.Join(php.Dir, exeName("php")), append([]string{phar}, args...)...)
 	cmd.Dir = dir
-	cmd.Env = envWithPath(m.toolDirs(), "COMPOSER_NO_INTERACTION=1", "PHPRC="+php.Dir)
+	cmd.Env = envWithPath(m.toolDirsFor(php), "COMPOSER_NO_INTERACTION=1", "PHPRC="+php.Dir)
 	hideWindow(cmd)
 	return cmd, nil
 }
 
 func (m *Manager) artisanCmd(ctx context.Context, dir string, args ...string) (*exec.Cmd, error) {
-	php, ok := m.CurrentPHP()
+	php, ok := m.phpForDir(dir)
 	if !ok {
 		return nil, errors.New("PHP not found")
 	}
 	cmd := exec.CommandContext(ctx, filepath.Join(php.Dir, exeName("php")), append([]string{"artisan"}, args...)...)
 	cmd.Dir = dir
-	cmd.Env = envWithPath(m.toolDirs(), "PHPRC="+php.Dir)
+	cmd.Env = envWithPath(m.toolDirsFor(php), "PHPRC="+php.Dir)
 	hideWindow(cmd)
 	return cmd, nil
 }

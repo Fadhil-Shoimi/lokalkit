@@ -29,6 +29,9 @@ type Project struct {
 	NeedsAssets    bool   `json:"needsAssets"`    // starter kit front-end not built yet
 	EnvURL         string `json:"envUrl"`         // APP_URL from the project's .env
 	EnvURLMismatch bool   `json:"envUrlMismatch"` // APP_URL points somewhere else (e.g. .test from Laragon)
+	PHP            string `json:"php"`            // PHP branch the project is pinned to ("" = default PHP)
+	PHPVersion     string `json:"phpVersion"`     // PHP version it actually runs on
+	PHPMissing     bool   `json:"phpMissing"`     // pinned PHP is not installed (falls back to the default)
 }
 
 var hostLabelRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
@@ -172,10 +175,20 @@ func (m *Manager) WriteVhosts(ssl *SSLFiles) error {
 	if !cfg.AutoVhost {
 		return nil
 	}
-	for _, p := range m.Projects() {
+	projects := m.Projects()
+	balancer := m.phpBalancerAvailable()
+	if pools := BuildPHPPoolConf(m.pinnedPHP(projects), balancer); pools != "" {
+		if err := os.WriteFile(filepath.Join(dir, "auto.002-php-pools.conf"), []byte(pools), 0o644); err != nil {
+			return err
+		}
+	}
+	for _, p := range projects {
 		conf := BuildVhost(p, cfg.ApachePort)
 		if ssl != nil {
 			conf += "\n" + BuildSSLVhost(p, *ssl)
+		}
+		if php, override, _, ok := m.ProjectPHPChoice(p.Name); ok && override && p.Kind != "adonis" {
+			conf = withPHPHandler(conf, php, balancer)
 		}
 		if p.Kind == "adonis" && p.ProxyPort > 0 {
 			conf = BuildProxyVhost(p, cfg.ApachePort, nil)

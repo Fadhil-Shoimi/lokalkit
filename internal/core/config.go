@@ -10,21 +10,22 @@ import (
 
 // Config is saved as lokalkit.json in the root folder.
 type Config struct {
-	ApachePort       int             `json:"apachePort"`
-	MySQLPort        int             `json:"mysqlPort"`
-	MailpitSMTPPort  int             `json:"mailpitSmtpPort"`
-	MailpitHTTPPort  int             `json:"mailpitHttpPort"`
-	PHPVersion       string          `json:"phpVersion"` // folder name inside bin/php; empty = newest
-	TLD              string          `json:"tld"`
-	AutoVhost        bool            `json:"autoVhost"`
-	StartAllOnLaunch bool            `json:"startAllOnLaunch"`
-	StopAllOnExit    bool            `json:"stopAllOnExit"`
-	MinimizeToTray   bool            `json:"minimizeToTray"` // close button hides to the system tray
-	SSL              bool            `json:"ssl"`            // HTTPS for every project (https://name.test)
-	SSLPort          int             `json:"sslPort"`
-	CheckUpdates     bool            `json:"checkUpdates"`             // look for new LokalKit versions
-	HideDeprecations bool            `json:"hideDeprecations"`         // keep PHP deprecation notices out of terminals and pages
-	Linked           []LinkedProject `json:"linkedProjects,omitempty"` // project folders outside www
+	ApachePort       int               `json:"apachePort"`
+	MySQLPort        int               `json:"mysqlPort"`
+	MailpitSMTPPort  int               `json:"mailpitSmtpPort"`
+	MailpitHTTPPort  int               `json:"mailpitHttpPort"`
+	PHPVersion       string            `json:"phpVersion"` // folder name inside bin/php; empty = newest
+	TLD              string            `json:"tld"`
+	AutoVhost        bool              `json:"autoVhost"`
+	StartAllOnLaunch bool              `json:"startAllOnLaunch"`
+	StopAllOnExit    bool              `json:"stopAllOnExit"`
+	MinimizeToTray   bool              `json:"minimizeToTray"` // close button hides to the system tray
+	SSL              bool              `json:"ssl"`            // HTTPS for every project (https://name.test)
+	SSLPort          int               `json:"sslPort"`
+	CheckUpdates     bool              `json:"checkUpdates"`             // look for new LokalKit versions
+	HideDeprecations bool              `json:"hideDeprecations"`         // keep PHP deprecation notices out of terminals and pages
+	Linked           []LinkedProject   `json:"linkedProjects,omitempty"` // project folders outside www
+	ProjectPHP       map[string]string `json:"projectPhp,omitempty"`     // project name -> PHP branch ("8.3"); missing = default PHP
 }
 
 // LinkedProject is a project folder that stays where it is (e.g. C:\laragon\www\shop).

@@ -599,6 +599,14 @@ func (a *App) FixHosts() ([]string, error) {
 	return a.m.MissingFromHosts(), err
 }
 
+// SetProjectPHP pins a project to a PHP branch ("8.3"), or "" for the default PHP.
+func (a *App) SetProjectPHP(name, branch string) error {
+	if err := a.ready(); err != nil {
+		return err
+	}
+	return a.m.SetProjectPHP(name, branch)
+}
+
 // UseLocalhostDomain switches project domains to name.localhost, which
 // browsers resolve by themselves (no hosts file, no admin prompt).
 func (a *App) UseLocalhostDomain() error {

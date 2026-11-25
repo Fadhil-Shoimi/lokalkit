@@ -87,6 +87,23 @@ function renderServices(services) {
   all.dataset.mode = anyRunning ? 'stop' : 'start';
 }
 
+// The PHP picker on a project card: "Default" follows the PHP chosen at the
+// top; a branch pins the project to that PHP (served through php-cgi).
+function projectPHPSelect(p) {
+  const def = state.php?.find((x) => x.name === state.currentPhp);
+  const defBranch = def ? def.version.split('.').slice(0, 2).join('.') : '';
+  const branches = [...new Set((state.php || []).map((x) => x.version.split('.').slice(0, 2).join('.')))]
+    .filter((b) => b !== defBranch)
+    .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+  if (!branches.length && !p.php) return '';
+  if (p.php && !branches.includes(p.php) && p.php !== defBranch) branches.push(p.php);
+  const opt = (v, label) => `<option value="${esc(v)}"${(p.php || '') === v ? ' selected' : ''}>${esc(label)}</option>`;
+  return `<select class="proj-php${p.php ? ' pinned' : ''}" data-projphp="${esc(p.name)}" title="PHP version for this project">
+    ${opt('', `PHP ${def ? def.version : ''} (default)`)}
+    ${branches.map((b) => opt(b, `PHP ${b}`)).join('')}
+  </select>`;
+}
+
 function renderProjects(projects) {
   $('#projCount').textContent = projects.length || '';
   $('#projCount').hidden = !projects.length;
@@ -99,13 +116,14 @@ function renderProjects(projects) {
     <div class="card proj">
       <div class="proj-icon ${p.kind}">${icon(p.kind === 'wordpress' ? 'globe' : p.kind === 'adonis' ? 'terminal' : 'code')}</div>
       <div class="proj-main">
-        <div class="proj-name">${esc(p.name)}${p.kind !== 'php' ? `<span class="badge ${p.kind}">${p.kind === 'adonis' ? 'adonisjs' : p.kind}</span>` : ''}${p.linked ? `<span class="badge linked" title="${esc(p.path)}">imported</span>` : ''}</div>
+        <div class="proj-name">${esc(p.name)}${p.kind !== 'php' ? `<span class="badge ${p.kind}">${p.kind === 'adonis' ? 'adonisjs' : p.kind}</span>` : ''}${p.linked ? `<span class="badge linked" title="${esc(p.path)}">imported</span>` : ''}${p.kind !== 'adonis' ? projectPHPSelect(p) : ''}</div>
         <div class="proj-links">
           ${p.https
             ? `<a class="proj-url" data-url="${esc(p.https)}" title="${apacheUp ? 'Open in browser' : 'Start Apache first'}">${esc(p.https)}</a>
                <a class="proj-url alt" data-url="${esc(p.url)}">http</a>`
             : `<a class="proj-url" data-url="${esc(p.url)}" title="${apacheUp ? 'Open in browser' : 'Start Apache first'}">${esc(p.url)}</a>`}
         </div>
+        ${p.phpMissing ? `<div class="proj-warn">⚠ Set to PHP ${esc(p.php)}, which is not installed, so it runs on PHP ${esc(p.phpVersion)}. Install PHP ${esc(p.php)} from the PHP menu, or pick another version.</div>` : ''}
         ${p.kind === 'adonis' && !p.task ? `<div class="proj-dev ${p.devRunning ? 'on' : ''}"><span class="dot"></span>${p.devRunning ? `Dev server running on port ${p.proxyPort}` : `Dev server stopped (port ${p.proxyPort})`}</div>` : ''}
         ${p.task ? `<div class="proj-task"><span class="spin"></span>${esc(p.task)}</div>`
           : p.error ? `<div class="proj-warn">⚠ Setup failed: ${esc(p.error)} <button class="linkish" data-repair="${esc(p.name)}">Retry</button></div>`
@@ -409,6 +427,16 @@ document.addEventListener('click', (ev) => {
     };
     run(acts[t.dataset.act], t);
   }
+});
+
+document.addEventListener('change', (ev) => {
+  const sel = ev.target.closest('select[data-projphp]');
+  if (!sel) return;
+  sel.disabled = true;
+  run(async () => {
+    await api.SetProjectPHP(sel.dataset.projphp, sel.value);
+    toast(sel.value ? `${sel.dataset.projphp} now uses PHP ${sel.value}` : `${sel.dataset.projphp} now uses the default PHP`);
+  }).finally(() => refreshProjects());
 });
 
 async function refreshProjects() {

@@ -111,22 +111,27 @@ func BuildTerminalFragment(initPath, iconPath, startDir string) ([]byte, error) 
 
 // prepareTerminal writes the init script (and on Windows the Windows
 // Terminal fragment + icon) and returns the init script path.
-func (m *Manager) prepareTerminal() (string, error) {
+func (m *Manager) prepareTerminal(php PHPInstall) (string, error) {
 	dir := m.terminalDir()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
 	phpV := ""
-	if p, ok := m.CurrentPHP(); ok {
-		phpV = p.Version
-		_ = m.EnsurePHPIni(p) // also repairs extension_dir / duplicate extensions
+	if php.Dir != "" {
+		phpV = php.Version
+		_ = m.EnsurePHPIni(php) // also repairs extension_dir / duplicate extensions
 	}
 	nodeV := ""
 	if node := m.nodeBin(); node != "" {
 		nodeV = probeVersion(node, "-v")
 	}
-	initPath := filepath.Join(dir, "lokalkit-init.cmd")
-	if err := os.WriteFile(initPath, []byte(BuildTerminalInit(m.toolDirs(), phpV, nodeV, m.config().MySQLPort)), 0o644); err != nil {
+	// One init script per PHP, so a project's terminal gets its own PHP.
+	initName := "lokalkit-init.cmd"
+	if def, ok := m.CurrentPHP(); ok && php.Dir != "" && php.Name != def.Name {
+		initName = "lokalkit-init-php" + strings.ReplaceAll(PHPBranch(php.Version), ".", "") + ".cmd"
+	}
+	initPath := filepath.Join(dir, initName)
+	if err := os.WriteFile(initPath, []byte(BuildTerminalInit(m.toolDirsFor(php), phpV, nodeV, m.config().MySQLPort)), 0o644); err != nil {
 		return "", err
 	}
 	if runtime.GOOS == "windows" {
@@ -135,7 +140,8 @@ func (m *Manager) prepareTerminal() (string, error) {
 			iconPath = filepath.Join(dir, "lokalkit.ico")
 			_ = os.WriteFile(iconPath, TerminalIcon, 0o644)
 		}
-		if local := os.Getenv("LOCALAPPDATA"); local != "" {
+		// The profile always starts the default init script.
+		if local := os.Getenv("LOCALAPPDATA"); local != "" && initName == "lokalkit-init.cmd" {
 			frag, err := BuildTerminalFragment(initPath, iconPath, m.P.WWW)
 			if err == nil {
 				fdir := filepath.Join(local, "Microsoft", "Windows Terminal", "Fragments", "LokalKit")

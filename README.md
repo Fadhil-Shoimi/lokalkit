@@ -15,6 +15,7 @@ A local PHP development environment for Windows. **Apache + PHP + MySQL + Mailpi
 - `public\` folders are detected automatically (Laravel, Symfony)
 - Switch PHP versions. `php.ini` is generated for you with the common extensions enabled
 - **PHP updates**: a **↑ 8.x.y** button appears next to the PHP menu when windows.php.net has a newer build of your PHP; other PHP branches (e.g. 8.4, 8.5) can be downloaded from the menu. Your `php.ini` is carried over, Apache restarts, and the previous PHP stays installed so you can switch back
+- **PHP per project**: each project card has a PHP picker. Leave it on *default* or pin the project to another installed branch (e.g. an older Laravel on PHP 8.3 while new projects use 8.6). See [PHP per project](#php-per-project)
 - MySQL is initialized on first start (`root`, no password)
 - PHP `mail()` goes straight to Mailpit
 - **LokalKit Terminal**: opens in Windows Terminal with a LokalKit profile (black & yellow theme, switch icon), a coloured prompt, PHP/Composer/MySQL/Node on PATH and `art` as a shortcut for `php artisan`. The "LokalKit" profile also appears in Windows Terminal's ⌄ menu
@@ -106,6 +107,19 @@ Publishing a release: create a release with a tag such as `v0.2.0` on GitHub. Th
 - an Apache reverse proxy so `https://name.localhost` reaches the dev server, hot reload websockets included. When the dev server is stopped the page says so
 
 Dev servers stop when LokalKit quits (Stop All).
+
+## PHP per project
+
+Every PHP project card has a small **PHP** picker:
+
+- **PHP x.y.z (default)** follows the PHP chosen in the top menu. Apache runs it as a module, as before.
+- **PHP 8.3** (or any other installed branch) pins the project to that branch. Apache is reloaded and the project runs on it straight away; other projects are not affected.
+
+Pinned projects are served by `php-cgi.exe` of their PHP: LokalKit starts 4 workers per pinned branch on fixed local ports (`98x0`–`98x3`, e.g. 9830–9833 for 8.3) and Apache sends that project's `.php` files to them (`mod_proxy_fcgi`, balanced with `mod_proxy_balancer`). The workers stop with Apache; their output goes to `logs\php-cgi-8.3.log`.
+
+The project's PHP is also used by its **Terminal** button (and `art`/`composer` there), and by Composer/artisan runs that LokalKit does for the project (Repair, migrations).
+
+To keep an existing project on its current PHP before you switch the default to a newer one, pin it first (e.g. pin *qistas* to 8.4, then switch the top menu to 8.6). A project pinned to a branch you later remove falls back to the default PHP and shows a warning.
 
 ## A quiet terminal for older projects
 
@@ -225,6 +239,7 @@ Code layout:
 - [x] System tray icon
 - [x] Local SSL (`https://project.test`)
 - [x] Download binaries from inside the app
+- [x] PHP version per project
 - [ ] Redis, PostgreSQL, Node.js
 - [ ] Installer (NSIS)
 - [ ] Share projects (tunnel)

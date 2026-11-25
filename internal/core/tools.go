@@ -12,8 +12,14 @@ import (
 
 // toolDirs are the folders added to PATH in LokalKit terminals.
 func (m *Manager) toolDirs() []string {
+	php, _ := m.CurrentPHP()
+	return m.toolDirsFor(php)
+}
+
+// toolDirsFor is toolDirs with a given PHP first on PATH.
+func (m *Manager) toolDirsFor(php PHPInstall) []string {
 	var dirs []string
-	if php, ok := m.CurrentPHP(); ok {
+	if php.Dir != "" {
 		dirs = append(dirs, php.Dir)
 	}
 	if bin := findUnder(filepath.Join(m.P.Bin, "mysql"), filepath.Join("bin", exeName("mysql"))); bin != "" {
@@ -55,11 +61,12 @@ func (m *Manager) OpenTerminal(dir, command string) error {
 	if dir == "" {
 		dir = m.P.WWW
 	}
-	env := envWithPath(m.toolDirs())
+	php, _ := m.phpForDir(dir) // a project's terminal gets the project's PHP
+	env := envWithPath(m.toolDirsFor(php))
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
 		if command == "" {
-			initPath, err := m.prepareTerminal()
+			initPath, err := m.prepareTerminal(php)
 			if err != nil {
 				return err
 			}

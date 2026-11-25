@@ -59,6 +59,7 @@ type Manager struct {
 
 	tasks projectTasks // background Composer/Laravel jobs per project
 	devs  devServers   // AdonisJS dev servers per project
+	cgi   phpPools     // php-cgi workers for projects pinned to another PHP
 
 	watchMu sync.Mutex
 	projSig string // last seen projects signature (see WatchProjects)

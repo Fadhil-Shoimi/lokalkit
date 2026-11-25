@@ -209,6 +209,9 @@ option, optgroup { background: var(--surface); color: var(--text); }
 .badge.laravel { background: #fdecec; color: #d43b2a; }
 .badge.wordpress { background: #e6f0fb; color: #21759b; }
 .badge.linked { background: transparent; color: var(--muted); border: 1px dashed var(--border-strong); }
+.proj-php { font-size: 11px; font-weight: 500; padding: 1px 6px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--muted); cursor: pointer; outline: none; }
+.proj-php:hover { color: var(--text); }
+.proj-php.pinned { border-color: var(--accent); color: var(--text); }
 @media (prefers-color-scheme: dark) {
   .badge.laravel { background: #3a1f1c; color: #ff7d6b; }
   .badge.wordpress { background: #172a3a; color: #6cb6e0; }

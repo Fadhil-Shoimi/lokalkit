@@ -79,6 +79,10 @@ func (a *Apache) Start() error {
 	if err := a.m.WriteVhosts(ssl); err != nil {
 		return err
 	}
+	// php-cgi workers for projects pinned to another PHP version.
+	if err := a.m.startPHPPools(a.m.pinnedPHP(a.m.Projects())); err != nil {
+		a.m.Logf("error", "%v", err)
+	}
 	mods := availableModules(apacheDir)
 	if ssl != nil {
 		for _, m := range []string{"socache_shmcb", "ssl"} {
@@ -122,13 +126,18 @@ func (a *Apache) Start() error {
 	return nil
 }
 
-func (a *Apache) Stop() error { return a.proc.Stop(nil, 0) }
+func (a *Apache) Stop() error {
+	err := a.proc.Stop(nil, 0)
+	a.m.stopPHPPools()
+	return err
+}
 
 var wantedModules = []string{
 	"access_compat", "actions", "alias", "allowmethods", "auth_basic", "authn_core",
 	"authn_file", "authz_core", "authz_groupfile", "authz_host", "authz_user",
 	"autoindex", "deflate", "dir", "env", "expires", "filter", "headers", "include",
-	"log_config", "mime", "negotiation", "proxy", "proxy_fcgi", "proxy_http", "proxy_wstunnel",
+	"lbmethod_byrequests", "log_config", "mime", "negotiation", "proxy", "proxy_balancer", "proxy_fcgi",
+	"proxy_http", "proxy_wstunnel", "slotmem_shm",
 	"rewrite", "setenvif", "version",
 }
 

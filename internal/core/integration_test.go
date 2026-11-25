@@ -141,6 +141,49 @@ func runApacheIntegration(t *testing.T, tld string) {
 		}
 	}
 
+	// PHP per project: pin blog to another PHP, served by php-cgi workers.
+	if cgi, err := exec.LookPath("php-cgi"); err == nil {
+		other := filepath.Join(p.Bin, "php", "php-8.2.0")
+		os.MkdirAll(other, 0o755)
+		os.WriteFile(filepath.Join(other, "php"), nil, 0o755)
+		os.Symlink(cgi, filepath.Join(other, "php-cgi"))
+		os.WriteFile(filepath.Join(other, "php.ini"), []byte("; test\n"), 0o644)
+		os.WriteFile(filepath.Join(p.WWW, "blog", "sapi.php"), []byte(`<?php echo php_sapi_name(), " ", $_SERVER["HTTP_AUTHORIZATION"] ?? "-";`), 0o644)
+		sapi := func() string {
+			t.Helper()
+			req, _ := http.NewRequest("GET", strings.Replace(m.findProject("blog").HTTPS, "://blog", "://blog", 1)+"/sapi.php", nil)
+			req.Header.Set("Authorization", "Bearer abc")
+			resp, err := client.Do(req)
+			if err != nil {
+				t.Fatalf("GET sapi: %v", err)
+			}
+			defer resp.Body.Close()
+			b, _ := io.ReadAll(resp.Body)
+			return string(b)
+		}
+		if body := sapi(); !strings.HasPrefix(body, "apache2handler") {
+			t.Errorf("default PHP should be the module, got %q", body)
+		}
+		if err := m.SetProjectPHP("blog", "8.2"); err != nil {
+			t.Fatal(err)
+		}
+		if body := sapi(); body != "cgi-fcgi Bearer abc" {
+			b, _ := os.ReadFile(filepath.Join(p.Logs, "apache_error.log"))
+			t.Errorf("pinned project should run on php-cgi with auth header, got %q\n%s", body, b)
+		}
+		if body := get(m.findProject("kedai").HTTPS); !strings.HasPrefix(body, "kedai ok 8 on") {
+			t.Errorf("other projects stay on the module: %q", body)
+		}
+		if err := m.SetProjectPHP("blog", ""); err != nil {
+			t.Fatal(err)
+		}
+		if body := sapi(); !strings.HasPrefix(body, "apache2handler") {
+			t.Errorf("unpinned again should use the module, got %q", body)
+		}
+	} else {
+		t.Log("php-cgi not installed: skipping PHP per project")
+	}
+
 	// An AdonisJS project: Apache proxies its domain to the Node dev server.
 	setupFakeNode(t, m)
 	t.Cleanup(m.stopAllDev)
