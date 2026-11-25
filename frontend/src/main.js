@@ -113,7 +113,7 @@ function renderProjects(projects) {
           : p.needsDeps ? `<div class="proj-warn">⚠ ${p.kind === 'adonis' ? 'npm packages are missing (node_modules)' : 'Composer packages are missing (vendor folder)'}, so the app can't run. <button class="linkish" data-repair="${esc(p.name)}">Repair</button></div>` : ''}
         ${p.envUrlMismatch ? `<div class="proj-warn">⚠ APP_URL in .env is <code>${esc(p.envUrl)}</code>, but LokalKit serves this project at <code>${esc(p.https || p.url)}</code>. <button class="linkish" data-fixappurl="${esc(p.name)}">Fix APP_URL</button></div>` : ''}
         ${(state.missingDbs || []).filter((d) => d.project === p.name).map((d) => `<div class="proj-warn">⚠ Database <code>${esc(d.database)}</code> (from .env) doesn't exist in MySQL. <button class="linkish" data-createdb="${esc(p.name)}">Create it${d.laravel ? ' + migrate' : ''}</button></div>`).join('')}
-        ${(state.missingHosts || []).includes(p.host) ? `<div class="proj-warn">⚠ Not in the Windows hosts file yet, so browsers can't find it. <button class="linkish" data-fixhosts="1">Fix now</button> or <button class="linkish" data-uselocalhost="1">use .localhost instead</button> (works without the hosts file)</div>` : ''}
+        ${(state.missingHosts || []).includes(p.host) ? `<div class="proj-warn">⚠ Not in the Windows hosts file yet, so browsers can't find it. <button class="linkish" data-fixhosts="1">Fix now</button> or <button class="linkish" data-uselocalhost="1">use .localhost instead</button> (works without the hosts file)${state.hostsBlocker === 'Kaspersky' ? `<br>Kaspersky is blocking the hosts file: add LokalKit.exe under Kaspersky &gt; Settings &gt; Security settings &gt; Exclusions &gt; Specify trusted applications, tick <i>Do not restrict application activity</i>, then click Fix now.` : ''}</div>` : ''}
       </div>
       <div class="proj-btns">
         ${p.kind === 'adonis' && !p.task && !p.needsDeps ? (p.devRunning
@@ -415,6 +415,7 @@ async function refreshProjects() {
   const s = await api.GetState();
   state.projects = s.projects;
   state.missingHosts = s.missingHosts;
+  state.hostsBlocker = s.hostsBlocker;
   state.missingDbs = s.missingDbs;
   renderProjects(s.projects);
 }

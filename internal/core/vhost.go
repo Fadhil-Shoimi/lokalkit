@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 )
 
@@ -297,13 +298,29 @@ func (m *Manager) projectHosts() []string {
 }
 
 // SyncHosts updates the hosts file, asking Windows for admin rights (UAC)
-// only when something actually changed.
-func (m *Manager) SyncHosts() error {
+// only when something actually changed. If an earlier attempt for the same
+// projects was blocked even with admin rights (an antivirus protecting the
+// hosts file), it does not ask again on every start; FixHosts retries.
+func (m *Manager) SyncHosts() error { return m.syncHosts(false) }
+
+// SyncHostsNow always tries, even after an earlier blocked attempt.
+func (m *Manager) SyncHostsNow() error { return m.syncHosts(true) }
+
+func (m *Manager) hostsBlockedPath() string { return filepath.Join(m.P.Etc, "hosts-blocked") }
+
+func hostsSignature(hosts []string) string {
+	hs := append([]string(nil), hosts...)
+	sort.Strings(hs)
+	return strings.Join(hs, " ")
+}
+
+func (m *Manager) syncHosts(force bool) error {
 	if m.UsesLocalhostTLD() {
 		return nil // browsers resolve *.localhost themselves; leave the hosts file alone
 	}
 	changed, err := SyncHostsFile(m.hostNames())
 	if err == nil {
+		_ = os.Remove(m.hostsBlockedPath())
 		if changed {
 			flushDNS()
 			m.Logf("info", "Hosts file updated")
@@ -313,12 +330,18 @@ func (m *Manager) SyncHosts() error {
 	if !errors.Is(err, ErrNeedAdmin) || runtime.GOOS != "windows" {
 		return fmt.Errorf("cannot update the hosts file: %w", err)
 	}
+	sig := hostsSignature(m.hostNames())
+	if !force && strings.TrimSpace(readSmall(m.hostsBlockedPath())) == sig {
+		m.Logf("info", "Skipped the hosts file: it was blocked last time%s. Projects marked ⚠ need \"Fix now\" (after allowing LokalKit) or the .localhost domain.", blockerSuffix())
+		return nil
+	}
 	m.Logf("info", "Asking for admin rights to update the hosts file (approve the Windows prompt)...")
 	helperLog := filepath.Join(m.P.Logs, "hosts-helper.log")
 	_ = os.Remove(helperLog)
 	exe, _ := os.Executable()
 	runErr := runElevated(exe, []string{"--sync-hosts", m.P.Root})
 	if still, _ := SyncHostsFile(m.hostNames()); !still {
+		_ = os.Remove(m.hostsBlockedPath())
 		flushDNS()
 		m.Logf("ok", "Hosts file updated")
 		return nil
@@ -330,7 +353,36 @@ func (m *Manager) SyncHosts() error {
 	if detail == "" {
 		detail = "unknown reason"
 	}
+	// Remember only real blocks, not a cancelled UAC prompt.
+	if strings.Contains(detail, "running as administrator") {
+		_ = os.WriteFile(m.hostsBlockedPath(), []byte(sig), 0o644)
+		if HostsBlocker() == "Kaspersky" {
+			return fmt.Errorf("Kaspersky blocked LokalKit from editing the hosts file. %s", kasperskyHint())
+		}
+	}
 	return fmt.Errorf("could not add your projects to the hosts file: %s. %s", detail, manualHostsHint)
+}
+
+// HostsBlocker names a running antivirus known to protect the hosts file.
+func HostsBlocker() string {
+	for _, exe := range []string{"avp.exe", "avpui.exe"} {
+		if len(runningPIDs(exe)) > 0 {
+			return "Kaspersky"
+		}
+	}
+	return ""
+}
+
+func blockerSuffix() string {
+	if b := HostsBlocker(); b != "" {
+		return " by " + b
+	}
+	return ""
+}
+
+func kasperskyHint() string {
+	exe, _ := os.Executable()
+	return fmt.Sprintf(`To allow it: open Kaspersky > Settings > Security settings > Exclusions and actions on object detection > Specify trusted applications > Add, choose %s and tick "Do not restrict application activity". Then click "Fix now" on a project. Or switch the domain to .localhost in Settings (no hosts file needed).`, exe)
 }
 
 const manualHostsHint = `Easiest fix: switch the domain to .localhost in Settings (no hosts file needed). Or add them by hand: open Notepad as administrator, open C:\Windows\System32\drivers\etc\hosts and add "127.0.0.1 project.test" for each project`

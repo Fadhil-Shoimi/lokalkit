@@ -318,6 +318,7 @@ type State struct {
 	SSL      core.SSLStatus         `json:"ssl"`
 	Missing  []string               `json:"missingHosts"` // project hosts not in the hosts file
 	NoDB     []core.MissingDatabase `json:"missingDbs"`   // projects whose MySQL database doesn't exist
+	Blocker  string                 `json:"hostsBlocker"` // antivirus guarding the hosts file, if any
 }
 
 func (a *App) GetState() State {
@@ -336,6 +337,9 @@ func (a *App) GetState() State {
 	s.SSL = a.m.SSLStatus()
 	s.Missing = a.m.MissingFromHosts()
 	s.NoDB = a.m.MissingDatabases()
+	if len(s.Missing) > 0 {
+		s.Blocker = core.HostsBlocker()
+	}
 	return s.withEmptyLists()
 }
 
@@ -591,7 +595,7 @@ func (a *App) FixHosts() ([]string, error) {
 	if err := a.ready(); err != nil {
 		return nil, err
 	}
-	err := a.m.SyncHosts()
+	err := a.m.SyncHostsNow()
 	return a.m.MissingFromHosts(), err
 }
 

@@ -120,6 +120,9 @@ Dev servers stop when LokalKit quits (Stop All).
 
 If a project shows **"Not in the Windows hosts file yet"** and **Fix now** fails, an antivirus "hosts file protection" feature is the usual cause. Switch to `.localhost`, or allow LokalKit in your antivirus.
 
+- **Kaspersky:** Settings > Security settings > Exclusions and actions on object detection > Specify trusted applications > Add `LokalKit.exe` and tick *Do not restrict application activity*, then click **Fix now**. Keep the exe in the same place when you update, so the exclusion still applies.
+- After a blocked attempt LokalKit stops asking for admin rights on every start (until the project list changes); **Fix now** always tries again.
+
 ## HTTPS (SSL)
 
 When Apache starts with HTTPS on (the default), LokalKit:
