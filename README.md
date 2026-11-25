@@ -18,7 +18,7 @@ A local PHP development environment for Windows. **Apache + PHP + MySQL + Mailpi
 - **PHP per project**: each project card has a PHP picker. Leave it on *default* or pin the project to another installed branch (e.g. an older Laravel on PHP 8.3 while new projects use 8.6). See [PHP per project](#php-per-project)
 - MySQL is initialized on first start (`root`, no password)
 - PHP `mail()` goes straight to Mailpit
-- **LokalKit Terminal**: opens in Windows Terminal with a LokalKit profile (black & yellow theme, switch icon), a coloured prompt, PHP/Composer/MySQL/Node on PATH and `art` as a shortcut for `php artisan`. The "LokalKit" profile also appears in Windows Terminal's ⌄ menu
+- **LokalKit Terminal**: opens in Windows Terminal with a LokalKit profile (black & yellow theme, switch icon), PHP/Composer/MySQL/Node on PATH, `art` for `php artisan`, and a **git-aware prompt** showing the current branch, uncommitted changes, commits to push/pull and branches not pushed yet. With **Clink** (Install tab): Tab completion for git branches and remotes, saved history, Ctrl+R search and suggestions. See [Terminal and git](#terminal-and-git)
 - Quick buttons: Web, Database (opens DBeaver with a ready "LokalKit MySQL" connection, else HeidiSQL or Adminer), Terminal (PHP, Composer and MySQL on PATH), www folder
 - Create new projects: blank PHP, **Laravel**, or Laravel with the official **React, Vue or Livewire starter kit** (always the latest, from each kit's main branch like the Laravel installer). Composer runs inside LokalKit with progress on the project; the kit's own setup steps run, `.env` is prepared (HTTPS `APP_URL`, MySQL database + migrations when MySQL is running, Mailpit), and the front-end is built with `npm install` + `npm run build`. Projects with missing packages or an unbuilt front-end get a **Repair / Build now** button
 - **Database per new project**: choose *Create a MySQL database* (named after the project, editable; MySQL is started if needed; `.env` set up and migrations run, so the starter kits' login/register work right away), *SQLite*, or *No database*
@@ -120,6 +120,29 @@ Pinned projects are served by `php-cgi.exe` of their PHP: LokalKit starts 4 work
 The project's PHP is also used by its **Terminal** button (and `art`/`composer` there), and by Composer/artisan runs that LokalKit does for the project (Repair, migrations).
 
 To keep an existing project on its current PHP before you switch the default to a newer one, pin it first (e.g. pin *qistas* to 8.4, then switch the top menu to 8.6). A project pinned to a branch you later remove falls back to the default PHP and shows a warning.
+
+## Terminal and git
+
+The prompt shows where you are and, inside a git repository, the branch and its state:
+
+```
+● C:\laragon\www\hrms-maiwp-v2  git:(fasa-9b/jadual-cuti-umum-sekolah) ●2 ↑1
+❯
+```
+
+| Sign | Meaning |
+| --- | --- |
+| `git:(name)` | current branch (`(a1b2c3d)` when on a commit, not a branch) |
+| `✓` / `●2` | no uncommitted changes / 2 changed or new files |
+| `↑1` / `↓3` | 1 commit to push / 3 commits to pull |
+| `(not pushed)` | the branch has no upstream yet: `git push -u origin <branch>` |
+| `MERGE`, `REBASE-I`… | a merge or rebase is in progress (Clink only) |
+
+Shortcuts: `gs` status, `gl` short log graph, `gd` diff, `gco` checkout, `gp` push, `gpl` pull (`art` = `php artisan`).
+
+Without Clink, `cmd.exe` cannot redraw its prompt by itself, so LokalKit refreshes it when the terminal opens and after `git`, `cd`, `pushd`, `popd` and the shortcuts. A branch changed from another app (e.g. VS Code) shows after the next of those commands.
+
+**Clink** (Install tab, recommended) makes the prompt redraw on every Enter and adds Tab completion for git subcommands, branches (local and remote) and remotes, history saved between sessions, Ctrl+R history search and suggestions as you type (→ to accept). LokalKit uses its own Clink profile in `etc\terminal\clink`; put your own Clink `.lua` scripts there.
 
 ## A quiet terminal for older projects
 

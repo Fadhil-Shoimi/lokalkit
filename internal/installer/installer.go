@@ -71,6 +71,7 @@ func New(root string, detect Detector, onProgress func(Progress)) *Installer {
 			"adminer":  ResolveAdminer,
 			"nodejs":   ResolveNode,
 			"dbeaver":  ResolveDBeaver,
+			"clink":    ResolveClink,
 			"vcredist": func(_ context.Context, s Sources) (Artifact, error) {
 				return Artifact{Version: "latest", Kind: "run", Name: "vc_redist.x64.exe", URLs: []string{s.VCRedistURL}}, nil
 			},
@@ -87,6 +88,7 @@ var catalog = []Component{
 	{ID: "composer", Name: "Composer", Description: "PHP package manager (needed for Laravel)", Recommended: true},
 	{ID: "nodejs", Name: "Node.js", Description: "JavaScript runtime (LTS), builds the front-end of Laravel starter kits", Recommended: true},
 	{ID: "dbeaver", Name: "DBeaver Community", Description: "Full database manager (free, similar to Navicat). About 130 MB, Java included"},
+	{ID: "clink", Name: "Clink", Description: "Smarter LokalKit Terminal: always-current git branch in the prompt, Tab completion for git branches, saved history with Ctrl+R search", Recommended: true},
 	{ID: "adminer", Name: "Adminer", Description: "Database manager in the browser (http://localhost/adminer/)"},
 }
 
@@ -108,6 +110,8 @@ func (in *Installer) Components() []Component {
 			c.Installed, c.Version = nodeInstalled(in.Root)
 		case "dbeaver":
 			c.Installed, c.Version = appInstalled(in.Root, "dbeaver", "dbeaver", "dbeaver-")
+		case "clink":
+			c.Installed, c.Version = appInstalled(in.Root, "clink", "clink_x64", "clink-")
 		default:
 			if in.Detect != nil {
 				c.Installed, c.Version = in.Detect(c.ID)

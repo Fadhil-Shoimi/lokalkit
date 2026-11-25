@@ -424,7 +424,7 @@ func TestPHPIniNoDuplicateMysqli(t *testing.T) {
 }
 
 func TestTerminalFiles(t *testing.T) {
-	init := BuildTerminalInit([]string{`C:\LokalKit\bin\php\php-8.3.37`}, "8.3.37", "26.13.1", 3306)
+	init := BuildTerminalInit([]string{`C:\LokalKit\bin\php\php-8.3.37`}, "8.3.37", "26.13.1", 3306, TerminalExtras{PromptScript: `C:\LokalKit\etc\terminal\lk-prompt.cmd`})
 	for _, want := range []string{"chcp 65001", `set "PATH=C:\LokalKit\bin\php\php-8.3.37;%PATH%"`, "doskey art=php artisan $*", "PHP 8.3.37", "Node 26.13.1", "prompt $E[38;2;250;204;21m", "\r\n"} {
 		if !strings.Contains(init, want) {
 			t.Errorf("init missing %q", want)
@@ -554,5 +554,40 @@ func TestAppURLMismatchAndSync(t *testing.T) {
 	}
 	if got := m.findProject("shop").EnvURL; got != "http://localhost" {
 		t.Errorf("default APP_URL must not change: %s", got)
+	}
+}
+
+func TestTerminalGitPrompt(t *testing.T) {
+	ps := BuildPromptScript()
+	for _, want := range []string{
+		"git branch --show-current", "git rev-parse --short HEAD", "status --porcelain",
+		"@{u}...HEAD", `set "LK_B=%LK_B:$=$$%"`, "git:(", "(not pushed)", ":nogit", "\r\n",
+	} {
+		if !strings.Contains(ps, want) {
+			t.Errorf("prompt script missing %q", want)
+		}
+	}
+	// Without Clink: macros refresh the prompt after git/cd and the script runs at start.
+	plain := BuildTerminalInit(nil, "8.4.1", "", 3306, TerminalExtras{PromptScript: `C:\LK\lk-prompt.cmd`})
+	for _, want := range []string{
+		`doskey git=git $* $T call "C:\LK\lk-prompt.cmd"`, `doskey cd=cd $* $T call "C:\LK\lk-prompt.cmd"`,
+		`doskey gs=git status $* $T call "C:\LK\lk-prompt.cmd"`, `call "C:\LK\lk-prompt.cmd"`, "Install Clink",
+	} {
+		if !strings.Contains(plain, want) {
+			t.Errorf("plain init missing %q", want)
+		}
+	}
+	// With Clink: no refresh macros, Clink is injected with LokalKit's profile.
+	cl := BuildTerminalInit(nil, "8.4.1", "", 3306, TerminalExtras{PromptScript: `C:\LK\lk-prompt.cmd`, ClinkExe: `C:\LK\clink_x64.exe`, ClinkProfile: `C:\LK\clink`})
+	if strings.Contains(cl, "doskey git=") || strings.Contains(cl, `call "C:\LK\lk-prompt.cmd"`) {
+		t.Errorf("clink init should not use the cmd prompt refresh:\n%s", cl)
+	}
+	if !strings.Contains(cl, `"C:\LK\clink_x64.exe" inject --quiet --profile "C:\LK\clink"`) || !strings.Contains(cl, "doskey gs=git status $*\r\n") {
+		t.Errorf("clink init:\n%s", cl)
+	}
+	for _, want := range []string{"clink.promptfilter", "git.getbranch", "promptcoroutine", "io.popenyield", `clink.argmatcher("git")`, `"checkout" .. br`} {
+		if !strings.Contains(ClinkLua, want) {
+			t.Errorf("clink lua missing %q", want)
+		}
 	}
 }

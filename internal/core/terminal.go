@@ -27,7 +27,7 @@ func (m *Manager) terminalDir() string { return filepath.Join(m.P.Etc, "terminal
 const esc = "\x1b"
 
 // BuildTerminalInit writes the batch file every LokalKit terminal runs first.
-func BuildTerminalInit(pathDirs []string, phpVersion, nodeVersion string, mysqlPort int) string {
+func BuildTerminalInit(pathDirs []string, phpVersion, nodeVersion string, mysqlPort int, x TerminalExtras) string {
 	yellow := esc + "[38;2;250;204;21m"
 	grey := esc + "[38;2;148;156;171m"
 	bold := esc + "[1m"
@@ -41,6 +41,18 @@ func BuildTerminalInit(pathDirs []string, phpVersion, nodeVersion string, mysqlP
 	}
 	w("title LokalKit Terminal")
 	w(`doskey art=php artisan $*`)
+	// Without Clink, the git prompt is refreshed after commands that can
+	// change the branch or the status.
+	refresh := ""
+	if x.ClinkExe == "" && x.PromptScript != "" {
+		refresh = ` $T call "` + x.PromptScript + `"`
+		for _, c := range []string{"git", "cd", "chdir", "pushd", "popd", "gh"} {
+			w("doskey " + c + "=" + c + " $*" + refresh)
+		}
+	}
+	for _, a := range gitAliases {
+		w("doskey " + a.name + "=" + a.cmd + refresh)
+	}
 	w("echo.")
 	w("echo  " + yellow + "●" + reset + " " + bold + "LokalKit" + reset + " Terminal " + grey + "by Codeslab" + reset)
 	var info []string
@@ -52,10 +64,20 @@ func BuildTerminalInit(pathDirs []string, phpVersion, nodeVersion string, mysqlP
 	}
 	info = append(info, fmt.Sprintf("MySQL 127.0.0.1:%d", mysqlPort))
 	w("echo  " + grey + strings.Join(info, "  ·  ") + reset)
-	w("echo  " + grey + "Tip: " + reset + "art = php artisan  " + grey + "(e.g. art migrate)" + reset)
+	w("echo  " + grey + "Tip: " + reset + "art = php artisan  " + grey + "·" + reset + "  gs gl gd gco gp gpl = git status/log/diff/checkout/push/pull")
+	if x.ClinkExe != "" {
+		w("echo  " + grey + "Tab completes git branches  ·  Ctrl+R searches history" + reset)
+	} else {
+		w("echo  " + grey + "Install Clink in LokalKit's Install tab for Tab completion and history search" + reset)
+	}
 	w("echo.")
 	// $E = escape, $P = current folder, $_ = new line.
-	w("prompt $E[38;2;250;204;21m●$E[0m $E[38;2;148;156;171m$P$E[0m$_$E[38;2;250;204;21m❯$E[0m ")
+	w("prompt " + basePrompt)
+	if x.ClinkExe != "" {
+		w(`"` + x.ClinkExe + `" inject --quiet --profile "` + x.ClinkProfile + `"`)
+	} else if x.PromptScript != "" {
+		w(`call "` + x.PromptScript + `"`)
+	}
 	return b.String()
 }
 
@@ -131,7 +153,21 @@ func (m *Manager) prepareTerminal(php PHPInstall) (string, error) {
 		initName = "lokalkit-init-php" + strings.ReplaceAll(PHPBranch(php.Version), ".", "") + ".cmd"
 	}
 	initPath := filepath.Join(dir, initName)
-	if err := os.WriteFile(initPath, []byte(BuildTerminalInit(m.toolDirsFor(php), phpV, nodeV, m.config().MySQLPort)), 0o644); err != nil {
+	x := TerminalExtras{PromptScript: filepath.Join(dir, "lk-prompt.cmd"), ClinkExe: m.clinkExe(), ClinkProfile: filepath.Join(dir, "clink")}
+	if err := os.WriteFile(x.PromptScript, []byte(BuildPromptScript()), 0o644); err != nil {
+		return "", err
+	}
+	if x.ClinkExe != "" {
+		if err := os.MkdirAll(x.ClinkProfile, 0o755); err != nil {
+			return "", err
+		}
+		_ = os.WriteFile(filepath.Join(x.ClinkProfile, "lokalkit.lua"), []byte(ClinkLua), 0o644)
+		// Settings only the first time, so changes made with "clink set" stay.
+		if settings := filepath.Join(x.ClinkProfile, "clink_settings"); !exists(settings) {
+			_ = os.WriteFile(settings, []byte(ClinkSettings), 0o644)
+		}
+	}
+	if err := os.WriteFile(initPath, []byte(BuildTerminalInit(m.toolDirsFor(php), phpV, nodeV, m.config().MySQLPort, x)), 0o644); err != nil {
 		return "", err
 	}
 	if runtime.GOOS == "windows" {

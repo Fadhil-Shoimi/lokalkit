@@ -84,6 +84,15 @@ func fakeSites(t *testing.T) (*httptest.Server, Sources) {
 	})
 	mux.HandleFunc("/dbeaver/latest.zip", func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) }) // force the mirror
 	mux.HandleFunc("/gh/26.2.5/dbeaver-ce-26.2.5-win32.win32.x86_64.zip", func(w http.ResponseWriter, r *http.Request) { w.Write(dbeaverZip) })
+	clinkZip := makeZip(t, map[string]string{"clink_x64.exe": "clink", "clink_dll_x64.dll": "dll"})
+	clinkSum := sha256.Sum256(clinkZip)
+	mux.HandleFunc("/clink/latest", func(w http.ResponseWriter, r *http.Request) {
+		base := "http://" + r.Host
+		fmt.Fprintf(w, `{"tag_name":"v1.7.22","assets":[
+			{"name":"clink.1.7.22.ab12cd_setup.exe","browser_download_url":"%[1]s/clink/setup.exe"},
+			{"name":"clink.1.7.22.ab12cd.zip","browser_download_url":"%[1]s/clink/clink.zip","digest":"sha256:%[2]x"}]}`, base, clinkSum)
+	})
+	mux.HandleFunc("/clink/clink.zip", func(w http.ResponseWriter, r *http.Request) { w.Write(clinkZip) })
 	mux.HandleFunc("/adminer.php", func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, "<?php // adminer") })
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -96,6 +105,7 @@ func fakeSites(t *testing.T) (*httptest.Server, Sources) {
 		AdminerURL: u + "/adminer.php", NodeIndex: u + "/node/index.json", NodeBase: u + "/node/",
 		DBeaverURL: u + "/dbeaver/latest.zip", DBeaverVersion: u + "/dbeaver/version.xml",
 		DBeaverGitHub: u + "/gh/%s/dbeaver-ce-%s-win32.win32.x86_64.zip",
+		ClinkRelease:  u + "/clink/latest",
 	}
 }
 
@@ -127,7 +137,7 @@ func TestInstallEverything(t *testing.T) {
 		mu.Unlock()
 	})
 	in.sources = &s
-	if err := in.Install([]string{"adminer", "composer", "mailpit", "mysql", "php", "apache", "nodejs", "dbeaver"}); err != nil {
+	if err := in.Install([]string{"adminer", "composer", "mailpit", "mysql", "php", "apache", "nodejs", "dbeaver", "clink"}); err != nil {
 		t.Fatal(err)
 	}
 	for _, f := range []string{
@@ -139,6 +149,7 @@ func TestInstallEverything(t *testing.T) {
 		"etc/apps/adminer/index.php",
 		"bin/nodejs/node-v26.13.1-win-x64/node-v26.13.1-win-x64/node_modules/npm/bin/npm-cli.js",
 		"bin/dbeaver/dbeaver-26.2.5/dbeaver/jre/bin/java.exe",
+		"bin/clink/clink-1.7.22/clink_x64.exe",
 	} {
 		if !fileExists(filepath.Join(root, filepath.FromSlash(f))) {
 			t.Errorf("missing %s", f)

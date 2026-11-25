@@ -5,6 +5,7 @@ package installer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -36,6 +37,7 @@ type Sources struct {
 	DBeaverVersion  string   `json:"dbeaverVersionXml"`
 	DBeaverGitHub   string   `json:"dbeaverGithub"` // fallback, %s = version
 	NodeBase        string   `json:"nodeBase"`
+	ClinkRelease    string   `json:"clinkRelease"` // GitHub API "latest release" of Clink
 }
 
 // ManifestURL is where a newer Sources override is published.
@@ -63,6 +65,7 @@ func DefaultSources() Sources {
 		DBeaverVersion: "https://dbeaver.io/product/version.xml",
 		DBeaverGitHub:  "https://github.com/dbeaver/dbeaver/releases/download/%s/dbeaver-ce-%s-win32.win32.x86_64.zip",
 		NodeBase:       "https://nodejs.org/dist/",
+		ClinkRelease:   "https://api.github.com/repos/chrisant996/clink/releases/latest",
 	}
 }
 
@@ -138,6 +141,7 @@ func mergeSources(base, o Sources) Sources {
 	set(&base.DBeaverURL, o.DBeaverURL)
 	set(&base.DBeaverVersion, o.DBeaverVersion)
 	set(&base.DBeaverGitHub, o.DBeaverGitHub)
+	set(&base.ClinkRelease, o.ClinkRelease)
 	set(&base.NodeBase, o.NodeBase)
 	return base
 }
@@ -321,6 +325,38 @@ func ResolveDBeaver(ctx context.Context, s Sources) (Artifact, error) {
 		}
 	}
 	return art, nil
+}
+
+// ResolveClink finds the portable zip of the latest Clink release on GitHub
+// (not the setup exe), with its SHA-256 when GitHub publishes one.
+func ResolveClink(ctx context.Context, s Sources) (Artifact, error) {
+	b, err := get(ctx, s.ClinkRelease)
+	if err != nil {
+		return Artifact{}, fmt.Errorf("cannot read Clink releases: %w", err)
+	}
+	var rel struct {
+		Tag    string `json:"tag_name"`
+		Assets []struct {
+			Name   string `json:"name"`
+			URL    string `json:"browser_download_url"`
+			Digest string `json:"digest"`
+		} `json:"assets"`
+	}
+	if err := json.Unmarshal(b, &rel); err != nil {
+		return Artifact{}, fmt.Errorf("unexpected Clink release format: %w", err)
+	}
+	v := strings.TrimPrefix(rel.Tag, "v")
+	for _, a := range rel.Assets {
+		n := strings.ToLower(a.Name)
+		if strings.HasPrefix(n, "clink.") && strings.HasSuffix(n, ".zip") && !strings.Contains(n, "setup") && !strings.Contains(n, "symbols") {
+			art := Artifact{Version: v, Kind: "zip", Name: "clink-" + v, URLs: []string{a.URL}}
+			if sum, ok := strings.CutPrefix(a.Digest, "sha256:"); ok {
+				art.SHA256 = sum
+			}
+			return art, nil
+		}
+	}
+	return Artifact{}, errors.New("no Clink zip in the latest release")
 }
 
 // PHPRelease is the newest Thread Safe x64 build of one PHP branch.
