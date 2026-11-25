@@ -59,7 +59,9 @@ func runApacheIntegration(t *testing.T, tld string) {
 	os.WriteFile(filepath.Join(phpDir, "php.ini"), []byte("; test\n"), 0o644)
 	// Linux-only bits Windows Apache does not need.
 	os.WriteFile(filepath.Join(p.Etc, "apache", "custom.conf"), []byte(
-		"LoadModule mpm_prefork_module modules/mod_mpm_prefork.so\nUser www-data\nGroup www-data\n"), 0o644)
+		"LoadModule mpm_prefork_module modules/mod_mpm_prefork.so\nUser www-data\nGroup www-data\n"+
+			// Pinned projects define their balancers inside their own vhost.
+			"BalancerInherit Off\n"), 0o644)
 
 	os.MkdirAll(filepath.Join(p.WWW, "kedai", "public"), 0o755)
 	os.WriteFile(filepath.Join(p.WWW, "kedai", "public", "index.php"), []byte(`<?php echo "kedai ok ", PHP_MAJOR_VERSION, " ", ($_SERVER['HTTPS'] ?? 'off');`), 0o644)
@@ -148,7 +150,7 @@ func runApacheIntegration(t *testing.T, tld string) {
 		os.WriteFile(filepath.Join(other, "php"), nil, 0o755)
 		os.Symlink(cgi, filepath.Join(other, "php-cgi"))
 		os.WriteFile(filepath.Join(other, "php.ini"), []byte("; test\n"), 0o644)
-		os.WriteFile(filepath.Join(p.WWW, "blog", "sapi.php"), []byte(`<?php echo php_sapi_name(), " ", $_SERVER["HTTP_AUTHORIZATION"] ?? "-";`), 0o644)
+		os.WriteFile(filepath.Join(p.WWW, "blog", "sapi.php"), []byte(`<?php echo php_sapi_name(), " ", $_SERVER["HTTP_AUTHORIZATION"] ?? "-", " ", $_SERVER["SCRIPT_FILENAME"];`), 0o644)
 		sapi := func() string {
 			t.Helper()
 			req, _ := http.NewRequest("GET", strings.Replace(m.findProject("blog").HTTPS, "://blog", "://blog", 1)+"/sapi.php", nil)
@@ -167,7 +169,7 @@ func runApacheIntegration(t *testing.T, tld string) {
 		if err := m.SetProjectPHP("blog", "8.2"); err != nil {
 			t.Fatal(err)
 		}
-		if body := sapi(); body != "cgi-fcgi Bearer abc" {
+		if body := sapi(); body != "cgi-fcgi Bearer abc "+filepath.Join(p.WWW, "blog", "sapi.php") {
 			b, _ := os.ReadFile(filepath.Join(p.Logs, "apache_error.log"))
 			t.Errorf("pinned project should run on php-cgi with auth header, got %q\n%s", body, b)
 		}

@@ -136,8 +136,9 @@ var wantedModules = []string{
 	"access_compat", "actions", "alias", "allowmethods", "auth_basic", "authn_core",
 	"authn_file", "authz_core", "authz_groupfile", "authz_host", "authz_user",
 	"autoindex", "deflate", "dir", "env", "expires", "filter", "headers", "include",
-	"lbmethod_byrequests", "log_config", "mime", "negotiation", "proxy", "proxy_balancer", "proxy_fcgi",
-	"proxy_http", "proxy_wstunnel", "slotmem_shm",
+	"log_config", "mime", "negotiation",
+	// mod_proxy first: on Windows its submodules need it loaded before them.
+	"proxy", "proxy_fcgi", "proxy_http", "proxy_wstunnel", "slotmem_shm", "proxy_balancer", "lbmethod_byrequests",
 	"rewrite", "setenvif", "version",
 }
 

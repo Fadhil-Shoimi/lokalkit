@@ -3,6 +3,7 @@ package core
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -26,24 +27,45 @@ func TestPHPHandlerInVhost(t *testing.T) {
 	php := PHPInstall{Version: "8.3.30"}
 	p := Project{Name: "qistas", Host: "qistas.test", DocRoot: `C:\www\qistas\public`}
 	conf := BuildVhost(p, 80) + "\n" + BuildSSLVhost(p, SSLFiles{Port: 443, Cert: "c", Key: "k"})
-	got := withPHPHandler(conf, php, true)
-	if n := strings.Count(got, `SetHandler "proxy:balancer://lokalkit-php83"`); n != 2 {
-		t.Errorf("want handler in both vhosts, got %d:\n%s", n, got)
+	got := withPHPHandler(conf, php, true, "qistas")
+	for _, want := range []string{
+		`<Proxy "balancer://lokalkit-php83-qistas-1">`, `SetHandler "proxy:balancer://lokalkit-php83-qistas-1/"`,
+		`<Proxy "balancer://lokalkit-php83-qistas-2">`, `SetHandler "proxy:balancer://lokalkit-php83-qistas-2/"`,
+		`BalancerMember "fcgi://127.0.0.1:9830"`, `BalancerMember "fcgi://127.0.0.1:9833"`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q:\n%s", want, got)
+		}
+	}
+	// Each balancer must sit inside its own <VirtualHost>.
+	for i, vh := range strings.Split(got, "</VirtualHost>")[:2] {
+		if strings.Count(vh, "<Proxy ") != 1 || !strings.Contains(vh, "<VirtualHost") {
+			t.Errorf("vhost %d should define exactly one balancer:\n%s", i, vh)
+		}
 	}
 	if strings.Count(got, "CGIPassAuth On") != 2 || strings.Count(got, "ProxyFCGIBackendType GENERIC") != 2 {
 		t.Errorf("missing CGIPassAuth/backend type:\n%s", got)
 	}
-	if direct := withPHPHandler(conf, php, false); !strings.Contains(direct, `proxy:fcgi://127.0.0.1:9830`) {
+	if direct := withPHPHandler(conf, php, false, "qistas"); !strings.Contains(direct, `SetHandler "proxy:fcgi://127.0.0.1:9830/"`) || strings.Contains(direct, "<Proxy") {
 		t.Errorf("no-balancer handler:\n%s", direct)
 	}
-	pool := BuildPHPPoolConf([]PHPInstall{php}, true)
-	for _, want := range []string{`<Proxy "balancer://lokalkit-php83">`, `BalancerMember "fcgi://127.0.0.1:9830"`, `BalancerMember "fcgi://127.0.0.1:9833"`} {
-		if !strings.Contains(pool, want) {
-			t.Errorf("pool conf missing %q:\n%s", want, pool)
+}
+
+func TestScriptFilenameFix(t *testing.T) {
+	re := regexp.MustCompile(scriptFilenameFix)
+	for in, want := range map[string]string{
+		"/C:/laragon/www/qistas/public/index.php": "C:/laragon/www/qistas/public/index.php",
+		"/c:/www/a.php":   "c:/www/a.php",
+		"//var/www/a.php": "/var/www/a.php",
+		"/var/www/a.php":  "/var/www/a.php",
+	} {
+		got := in // no match: Apache leaves the value as it is
+		if m := re.FindStringSubmatch(in); m != nil {
+			got = m[1]
 		}
-	}
-	if BuildPHPPoolConf(nil, true) != "" {
-		t.Error("no pools should give no conf")
+		if got != want {
+			t.Errorf("%s -> %s, want %s", in, got, want)
+		}
 	}
 }
 

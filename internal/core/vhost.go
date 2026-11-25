@@ -177,18 +177,13 @@ func (m *Manager) WriteVhosts(ssl *SSLFiles) error {
 	}
 	projects := m.Projects()
 	balancer := m.phpBalancerAvailable()
-	if pools := BuildPHPPoolConf(m.pinnedPHP(projects), balancer); pools != "" {
-		if err := os.WriteFile(filepath.Join(dir, "auto.002-php-pools.conf"), []byte(pools), 0o644); err != nil {
-			return err
-		}
-	}
 	for _, p := range projects {
 		conf := BuildVhost(p, cfg.ApachePort)
 		if ssl != nil {
 			conf += "\n" + BuildSSLVhost(p, *ssl)
 		}
 		if php, override, _, ok := m.ProjectPHPChoice(p.Name); ok && override && p.Kind != "adonis" {
-			conf = withPHPHandler(conf, php, balancer)
+			conf = withPHPHandler(conf, php, balancer, p.Name)
 		}
 		if p.Kind == "adonis" && p.ProxyPort > 0 {
 			conf = BuildProxyVhost(p, cfg.ApachePort, nil)
