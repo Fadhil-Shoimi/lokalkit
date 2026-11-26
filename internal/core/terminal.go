@@ -61,6 +61,9 @@ func BuildTerminalInit(pathDirs []string, phpVersion, nodeVersion string, mysqlP
 	if x.ClinkExe != "" {
 		w(`set "LK_CLINK=1"`)
 	}
+	if x.Exe != "" {
+		w(`set "LK_EXE=` + x.Exe + `"`)
+	}
 	w("title LokalKit Terminal")
 	w(`doskey art=php artisan $*`)
 	// Without Clink, the git prompt is refreshed after commands that can
@@ -89,7 +92,7 @@ func BuildTerminalInit(pathDirs []string, phpVersion, nodeVersion string, mysqlP
 	}
 	info = append(info, fmt.Sprintf("MySQL 127.0.0.1:%d", mysqlPort))
 	w("echo  " + grey + strings.Join(info, "  ·  ") + reset)
-	w("echo  " + grey + "Tip: " + reset + "p <project>" + grey + " jumps to a project  ·  " + reset + "lk-help" + grey + " lists all shortcuts" + reset)
+	w("echo  " + grey + "Tip: " + reset + "p <project>" + grey + " jumps to a project  ·  " + reset + "lk" + grey + " controls LokalKit  ·  " + reset + "lk-help" + grey + " lists all shortcuts" + reset)
 	if x.ClinkExe == "" {
 		w("echo  " + grey + "Install Clink in LokalKit's Install tab for Tab completion and history search" + reset)
 	}
@@ -179,6 +182,9 @@ func (m *Manager) prepareTerminal(php PHPInstall) (string, error) {
 	x := TerminalExtras{
 		PromptScript: filepath.Join(dir, "lk-prompt.cmd"), ClinkExe: m.clinkExe(), ClinkProfile: filepath.Join(dir, "clink"),
 		BinDir: filepath.Join(dir, "bin"), TerminalDir: dir, PHPDir: php.Dir,
+	}
+	if exe, err := os.Executable(); err == nil {
+		x.Exe = exe
 	}
 	if def, ok := m.CurrentPHP(); ok {
 		x.DefaultPHPDir, x.DefaultPHPVersion = def.Dir, def.Version

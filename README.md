@@ -160,6 +160,23 @@ The last three rows and the always-current prompt need **Clink** (below).
 | `gundo` | undo the last commit, keeping its changes |
 | `gclean` | delete local branches already merged (never main/master/develop) |
 | `lk-help` | show all of this in the terminal |
+| `lk …` | control LokalKit (below) |
+
+### `lk`: control LokalKit from the terminal
+
+| | |
+| --- | --- |
+| `lk status` | services, and the project you are in (address, PHP / dev server) |
+| `lk open` | open the current project in the browser |
+| `lk url` | print its address |
+| `lk log [lines]` | last lines of `storage/logs/laravel.log` (newest daily log too), the AdonisJS dev server log, or LokalKit's own log outside projects |
+| `lk php [8.4\|default]` | show or set the project's PHP (same as the picker on its card) |
+| `lk db` / `lk mail` / `lk folder` | DBeaver / Mailpit / Explorer |
+| `lk start\|stop\|restart [apache\|mysql\|mailpit]` | all services when none is given |
+| `lk dev [stop]` | AdonisJS dev server |
+| `lk repair` / `lk reload` / `lk projects` | repair packages / rescan projects / list them |
+
+`lk` talks to the running LokalKit through a local endpoint (127.0.0.1, random port, random token in `etc\terminal\lk-api.txt`, using Windows' built-in `curl.exe`). If LokalKit is closed, `lk` starts it in the tray first.
 
 ### Clink
 
@@ -169,7 +186,7 @@ The last three rows and the always-current prompt need **Clink** (below).
 - `art` / `php artisan` commands (read from the project, cached per terminal)
 - `node ace` commands (AdonisJS)
 - `npm run` scripts from `package.json`, and `composer` commands and scripts
-- project names after `p`
+- project names after `p`, and `lk` commands
 
 plus history saved between sessions, Ctrl+R history search and suggestions as you type (→ to accept). LokalKit uses its own Clink profile in `etc\terminal\clink`; put your own Clink `.lua` scripts there.
 

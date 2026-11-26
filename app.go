@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -44,6 +45,9 @@ type App struct {
 	phpCache   []installer.PHPRelease
 	quitting   bool // true when quitting for real (tray "Quit"), not hiding
 	hidTold    bool // already told the user the app keeps running in the tray
+
+	lkListener net.Listener     // endpoint of the terminal's lk command
+	openURL    func(url string) // opens a URL in the browser (replaceable in tests)
 }
 
 func NewApp() *App { return &App{} }
@@ -63,7 +67,9 @@ func (a *App) startup(ctx context.Context) {
 		return
 	}
 	a.m = m
+	a.openURL = func(url string) { runtime.BrowserOpenURL(ctx, url) }
 	m.ConfirmTrust = a.confirmTrust
+	a.startLK() // the terminal's lk command
 	core.TerminalIcon = tray.IconOn
 	a.tray = tray.Start(a.trayActions(), m.Services())
 	a.inst = installer.New(m.P.Root, a.detectComponent, func(p installer.Progress) {
@@ -139,6 +145,7 @@ func (a *App) QuitApp() {
 }
 
 func (a *App) shutdown(ctx context.Context) {
+	a.stopLK()
 	if a.stopWatch != nil {
 		close(a.stopWatch)
 	}

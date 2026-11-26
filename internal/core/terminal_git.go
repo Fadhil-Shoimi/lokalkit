@@ -27,6 +27,7 @@ type TerminalExtras struct {
 	PHPDir            string // PHP this terminal starts with
 	DefaultPHPDir     string // PHP outside projects
 	DefaultPHPVersion string
+	Exe               string // LokalKit.exe, so lk can start LokalKit when it is closed
 }
 
 // Prompt colours (24-bit), shared by the cmd and Clink prompts.
@@ -314,6 +315,21 @@ clink.argmatcher("git"):addarg({
   "switch" .. br, "tag",
 })
 clink.argmatcher("gco"):addarg({ branches })
+
+-- lk (LokalKit) commands.
+local lk_services = clink.argmatcher():addarg({ "apache", "mysql", "mailpit", "all" })
+clink.argmatcher("lk"):addarg({
+  "status", "open", "url", "log", "php" .. clink.argmatcher():addarg({ function()
+    local seen, out = { default = true }, { "default" }
+    for _, p in ipairs(projects()) do
+      local br = p.phpver:match("^(%d+%.%d+)")
+      if br and not seen[br] then seen[br] = true; table.insert(out, br) end
+    end
+    return out
+  end }), "db", "mail", "folder", "start" .. lk_services, "stop" .. lk_services,
+  "restart" .. lk_services, "dev" .. clink.argmatcher():addarg({ "stop" }), "repair", "reload",
+  "projects", "help",
+}):nofiles()
 
 -- Project names after "p".
 clink.argmatcher("p"):addarg({ function()

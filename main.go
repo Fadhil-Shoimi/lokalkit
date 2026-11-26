@@ -46,8 +46,17 @@ func main() {
 			app.resume = strings.Split(os.Args[i+1], ",")
 		}
 	}
+	// "--tray" (used by the terminal's lk command when LokalKit is closed)
+	// starts in the system tray without showing the window.
+	startHidden := false
+	for _, a := range os.Args[1:] {
+		if a == "--tray" {
+			startHidden = true
+		}
+	}
 	err := wails.Run(&options.App{
-		Title: "LokalKit",
+		StartHidden: startHidden,
+		Title:       "LokalKit",
 		// Opens at a size that fits the one-column layout; wider windows
 		// (or maximised) get the side Activity panel and two-column lists.
 		Width:     1184,
