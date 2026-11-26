@@ -152,6 +152,7 @@ func (m *Manager) WriteVhosts(ssl *SSLFiles) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
+	m.writeTerminalProjects() // keeps "p" and the terminal's PHP switch up to date
 	old, _ := filepath.Glob(filepath.Join(dir, "auto.*.conf"))
 	for _, f := range old {
 		_ = os.Remove(f)

@@ -126,7 +126,7 @@ To keep an existing project on its current PHP before you switch the default to 
 The prompt shows where you are and, inside a git repository, the branch and its state:
 
 ```
-● C:\laragon\www\hrms-maiwp-v2  git:(fasa-9b/jadual-cuti-umum-sekolah) ●2 ↑1
+● C:\laragon\www\qistas  git:(fasa-9b/jadual-cuti-umum-sekolah) ●2 ↑1  PHP 8.4.15  took 45s  ✗ 1
 ❯
 ```
 
@@ -135,14 +135,45 @@ The prompt shows where you are and, inside a git repository, the branch and its 
 | `git:(name)` | current branch (`(a1b2c3d)` when on a commit, not a branch) |
 | `✓` / `●2` | no uncommitted changes / 2 changed or new files |
 | `↑1` / `↓3` | 1 commit to push / 3 commits to pull |
-| `(not pushed)` | the branch has no upstream yet: `git push -u origin <branch>` |
-| `MERGE`, `REBASE-I`… | a merge or rebase is in progress (Clink only) |
+| `(not pushed)` | the branch has no upstream yet: `gpu` |
+| `MERGE`, `REBASE-I`… | a merge or rebase is in progress |
+| `PHP 8.4.15` / `Node 24.x` | the PHP (or Node, for AdonisJS) used in this project |
+| `took 45s` / `✗ 1` | the last command took 3 s or more / it failed with exit code 1 |
 
-Shortcuts: `gs` status, `gl` short log graph, `gd` diff, `gco` checkout, `gp` push, `gpl` pull (`art` = `php artisan`).
+The last three rows and the always-current prompt need **Clink** (below).
 
-Without Clink, `cmd.exe` cannot redraw its prompt by itself, so LokalKit refreshes it when the terminal opens and after `git`, `cd`, `pushd`, `popd` and the shortcuts. A branch changed from another app (e.g. VS Code) shows after the next of those commands.
+### Projects: `p`
 
-**Clink** (Install tab, recommended) makes the prompt redraw on every Enter and adds Tab completion for git subcommands, branches (local and remote) and remotes, history saved between sessions, Ctrl+R history search and suggestions as you type (→ to accept). LokalKit uses its own Clink profile in `etc\terminal\clink`; put your own Clink `.lua` scripts there.
+- `p` lists your projects (including ones imported from other folders) with their PHP.
+- `p qistas` (or just `p qis`) goes to the project **and puts the project's PHP on PATH**, so `php`, `art` and `composer` run on the PHP chosen on its card. With Clink this also happens when you simply `cd` into a project, and leaving it goes back to the default PHP.
+
+### Shortcuts
+
+| | |
+| --- | --- |
+| `art …` | `php artisan …` |
+| `gs` / `gl` / `gd` | status / short log graph / diff |
+| `gco <branch>` | checkout |
+| `gac <message>` | `git add -A` + `git commit -m <message>` (quotes optional) |
+| `gp` / `gpu` | push / push the current branch and set its upstream (`git push -u origin HEAD`) |
+| `gpl` / `gsync` | pull / pull with rebase |
+| `gundo` | undo the last commit, keeping its changes |
+| `gclean` | delete local branches already merged (never main/master/develop) |
+| `lk-help` | show all of this in the terminal |
+
+### Clink
+
+**Clink** (Install tab, recommended) redraws the prompt on every Enter and adds Tab completion for:
+
+- git subcommands, branches (local and remote) and remotes; `gco`
+- `art` / `php artisan` commands (read from the project, cached per terminal)
+- `node ace` commands (AdonisJS)
+- `npm run` scripts from `package.json`, and `composer` commands and scripts
+- project names after `p`
+
+plus history saved between sessions, Ctrl+R history search and suggestions as you type (→ to accept). LokalKit uses its own Clink profile in `etc\terminal\clink`; put your own Clink `.lua` scripts there.
+
+Without Clink, `cmd.exe` cannot redraw its prompt by itself, so LokalKit refreshes it when the terminal opens and after `git`, `cd`, `pushd`, `popd`, `p` and the shortcuts.
 
 ## A quiet terminal for older projects
 

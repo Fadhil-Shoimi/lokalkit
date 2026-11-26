@@ -424,8 +424,14 @@ func TestPHPIniNoDuplicateMysqli(t *testing.T) {
 }
 
 func TestTerminalFiles(t *testing.T) {
-	init := BuildTerminalInit([]string{`C:\LokalKit\bin\php\php-8.3.37`}, "8.3.37", "26.13.1", 3306, TerminalExtras{PromptScript: `C:\LokalKit\etc\terminal\lk-prompt.cmd`})
-	for _, want := range []string{"chcp 65001", `set "PATH=C:\LokalKit\bin\php\php-8.3.37;%PATH%"`, "doskey art=php artisan $*", "PHP 8.3.37", "Node 26.13.1", "prompt $E[38;2;250;204;21m", "\r\n"} {
+	init := BuildTerminalInit([]string{`C:\LokalKit\bin\mysql\bin`}, "8.3.37", "26.13.1", 3306, TerminalExtras{
+		PromptScript: `C:\LokalKit\etc\terminal\lk-prompt.cmd`, PHPDir: `C:\LokalKit\bin\php\php-8.3.37`,
+		BinDir: `C:\LokalKit\etc\terminal\bin`, TerminalDir: `C:\LokalKit\etc\terminal`,
+	})
+	for _, want := range []string{"chcp 65001",
+		`set "LK_BASEPATH=C:\LokalKit\etc\terminal\bin;C:\LokalKit\bin\mysql\bin;%PATH%"`,
+		`set "PATH=C:\LokalKit\bin\php\php-8.3.37;%LK_BASEPATH%"`, `set "LK_PHP=8.3.37"`,
+		`set "LK_TERMINAL=C:\LokalKit\etc\terminal"`, `doskey lk-help=type "C:\LokalKit\etc\terminal`, "doskey art=php artisan $*", "PHP 8.3.37", "Node 26.13.1", "prompt $E[38;2;250;204;21m", "\r\n"} {
 		if !strings.Contains(init, want) {
 			t.Errorf("init missing %q", want)
 		}
@@ -586,6 +592,56 @@ func TestTerminalGitPrompt(t *testing.T) {
 		t.Errorf("clink init:\n%s", cl)
 	}
 	for _, want := range []string{"clink.promptfilter", "git.getbranch", "promptcoroutine", "io.popenyield", `clink.argmatcher("git")`, `"checkout" .. br`} {
+		if !strings.Contains(ClinkLua, want) {
+			t.Errorf("clink lua missing %q", want)
+		}
+	}
+}
+
+func TestTerminalHelpers(t *testing.T) {
+	root := t.TempDir()
+	mk := func(name string) {
+		d := filepath.Join(root, "bin", "php", name)
+		os.MkdirAll(d, 0o755)
+		os.WriteFile(filepath.Join(d, exeName("php")), nil, 0o755)
+		os.WriteFile(filepath.Join(d, exeName("php-cgi")), nil, 0o755)
+	}
+	mk("php-8.6.0")
+	mk("php-8.4.15")
+	os.MkdirAll(filepath.Join(root, "www", "qistas", "public"), 0o755)
+	os.MkdirAll(filepath.Join(root, "www", "floral"), 0o755)
+	os.WriteFile(filepath.Join(root, "www", "floral", "ace.js"), nil, 0o644)
+	m, err := NewManager(root, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := m.Config()
+	cfg.ProjectPHP = map[string]string{"qistas": "8.4"}
+	m.SaveConfig(cfg)
+	if err := m.writeTerminalHelpers(); err != nil {
+		t.Fatal(err)
+	}
+	list, _ := os.ReadFile(filepath.Join(root, "etc", "terminal", "projects.txt"))
+	q := filepath.Join(root, "www", "qistas")
+	if !strings.Contains(string(list), "qistas|"+q+"|"+filepath.Join(root, "bin", "php", "php-8.4.15")+"|8.4.15|") {
+		t.Errorf("qistas should list its pinned PHP:\n%s", list)
+	}
+	if !strings.Contains(string(list), "|8.6.0|adonis\r\n") {
+		t.Errorf("floral should use the default PHP:\n%s", list)
+	}
+	for _, f := range []string{"bin/p.cmd", "bin/gac.cmd", "bin/gclean.cmd", "help.txt"} {
+		b, err := os.ReadFile(filepath.Join(root, "etc", "terminal", filepath.FromSlash(f)))
+		if err != nil || !strings.Contains(string(b), "\r\n") {
+			t.Errorf("%s: %v (needs CRLF)", f, err)
+		}
+	}
+	for _, want := range []string{`cd /d "%LK_TO%"`, `set "PATH=%LK_TOPHP%;%LK_BASEPATH%"`, `findstr /b /i`} {
+		if !strings.Contains(ProjectJumpScript, want) {
+			t.Errorf("p.cmd missing %q", want)
+		}
+	}
+	for _, want := range []string{"current_project", "use_php", `os.setenv("PATH"`, "artisan_commands", "list --raw",
+		"ace_commands", "npm_scripts", "composer_scripts", `clink.argmatcher("p")`, "onendedit", "geterrorlevel", "took "} {
 		if !strings.Contains(ClinkLua, want) {
 			t.Errorf("clink lua missing %q", want)
 		}

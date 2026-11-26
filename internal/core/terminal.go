@@ -27,6 +27,9 @@ func (m *Manager) terminalDir() string { return filepath.Join(m.P.Etc, "terminal
 const esc = "\x1b"
 
 // BuildTerminalInit writes the batch file every LokalKit terminal runs first.
+// pathDirs are the tool folders (MySQL, Composer, Node, Git) without PHP:
+// PHP goes in front of them and can be swapped (p command, Clink) without
+// PATH growing each time.
 func BuildTerminalInit(pathDirs []string, phpVersion, nodeVersion string, mysqlPort int, x TerminalExtras) string {
 	yellow := esc + "[38;2;250;204;21m"
 	grey := esc + "[38;2;148;156;171m"
@@ -36,8 +39,27 @@ func BuildTerminalInit(pathDirs []string, phpVersion, nodeVersion string, mysqlP
 	w := func(s string) { b.WriteString(s + "\r\n") }
 	w("@echo off")
 	w("chcp 65001 >nul")
-	if len(pathDirs) > 0 {
-		w(`set "PATH=` + strings.Join(pathDirs, ";") + `;%PATH%"`)
+	dirs := pathDirs
+	if x.BinDir != "" {
+		dirs = append([]string{x.BinDir}, dirs...)
+	}
+	base := "%PATH%"
+	if len(dirs) > 0 {
+		base = strings.Join(dirs, ";") + ";%PATH%"
+	}
+	w(`set "LK_BASEPATH=` + base + `"`)
+	if x.PHPDir != "" {
+		w(`set "PATH=` + x.PHPDir + `;%LK_BASEPATH%"`)
+	} else {
+		w(`set "PATH=%LK_BASEPATH%"`)
+	}
+	w(`set "LK_PHP=` + phpVersion + `" & set "LK_PHPDIR=` + x.PHPDir + `"`)
+	w(`set "LK_DEFPHP=` + x.DefaultPHPVersion + `" & set "LK_DEFPHPDIR=` + x.DefaultPHPDir + `"`)
+	if x.TerminalDir != "" {
+		w(`set "LK_TERMINAL=` + x.TerminalDir + `"`)
+	}
+	if x.ClinkExe != "" {
+		w(`set "LK_CLINK=1"`)
 	}
 	w("title LokalKit Terminal")
 	w(`doskey art=php artisan $*`)
@@ -53,6 +75,9 @@ func BuildTerminalInit(pathDirs []string, phpVersion, nodeVersion string, mysqlP
 	for _, a := range gitAliases {
 		w("doskey " + a.name + "=" + a.cmd + refresh)
 	}
+	if x.TerminalDir != "" {
+		w(`doskey lk-help=type "` + filepath.Join(x.TerminalDir, "help.txt") + `"`)
+	}
 	w("echo.")
 	w("echo  " + yellow + "●" + reset + " " + bold + "LokalKit" + reset + " Terminal " + grey + "by Codeslab" + reset)
 	var info []string
@@ -64,10 +89,8 @@ func BuildTerminalInit(pathDirs []string, phpVersion, nodeVersion string, mysqlP
 	}
 	info = append(info, fmt.Sprintf("MySQL 127.0.0.1:%d", mysqlPort))
 	w("echo  " + grey + strings.Join(info, "  ·  ") + reset)
-	w("echo  " + grey + "Tip: " + reset + "art = php artisan  " + grey + "·" + reset + "  gs gl gd gco gp gpl = git status/log/diff/checkout/push/pull")
-	if x.ClinkExe != "" {
-		w("echo  " + grey + "Tab completes git branches  ·  Ctrl+R searches history" + reset)
-	} else {
+	w("echo  " + grey + "Tip: " + reset + "p <project>" + grey + " jumps to a project  ·  " + reset + "lk-help" + grey + " lists all shortcuts" + reset)
+	if x.ClinkExe == "" {
 		w("echo  " + grey + "Install Clink in LokalKit's Install tab for Tab completion and history search" + reset)
 	}
 	w("echo.")
@@ -153,8 +176,17 @@ func (m *Manager) prepareTerminal(php PHPInstall) (string, error) {
 		initName = "lokalkit-init-php" + strings.ReplaceAll(PHPBranch(php.Version), ".", "") + ".cmd"
 	}
 	initPath := filepath.Join(dir, initName)
-	x := TerminalExtras{PromptScript: filepath.Join(dir, "lk-prompt.cmd"), ClinkExe: m.clinkExe(), ClinkProfile: filepath.Join(dir, "clink")}
+	x := TerminalExtras{
+		PromptScript: filepath.Join(dir, "lk-prompt.cmd"), ClinkExe: m.clinkExe(), ClinkProfile: filepath.Join(dir, "clink"),
+		BinDir: filepath.Join(dir, "bin"), TerminalDir: dir, PHPDir: php.Dir,
+	}
+	if def, ok := m.CurrentPHP(); ok {
+		x.DefaultPHPDir, x.DefaultPHPVersion = def.Dir, def.Version
+	}
 	if err := os.WriteFile(x.PromptScript, []byte(BuildPromptScript()), 0o644); err != nil {
+		return "", err
+	}
+	if err := m.writeTerminalHelpers(); err != nil {
 		return "", err
 	}
 	if x.ClinkExe != "" {
@@ -167,7 +199,7 @@ func (m *Manager) prepareTerminal(php PHPInstall) (string, error) {
 			_ = os.WriteFile(settings, []byte(ClinkSettings), 0o644)
 		}
 	}
-	if err := os.WriteFile(initPath, []byte(BuildTerminalInit(m.toolDirsFor(php), phpV, nodeV, m.config().MySQLPort, x)), 0o644); err != nil {
+	if err := os.WriteFile(initPath, []byte(BuildTerminalInit(m.toolDirsFor(PHPInstall{}), phpV, nodeV, m.config().MySQLPort, x)), 0o644); err != nil {
 		return "", err
 	}
 	if runtime.GOOS == "windows" {
